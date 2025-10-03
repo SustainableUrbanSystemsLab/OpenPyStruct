@@ -63,7 +63,7 @@ conda install numpy, torch, matplotlib, seaborn, scikit-learn
 
 ### Option 2, Conda Environment Install
 
-To create a Conda environment with all dependencies, run:
+To create a Conda environment with all dependencies run:
 
 ```zsh
 conda env create -f environment.yml
