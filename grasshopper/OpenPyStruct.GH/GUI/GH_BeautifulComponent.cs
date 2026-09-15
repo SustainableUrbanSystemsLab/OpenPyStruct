@@ -96,7 +96,7 @@ public abstract class GH_BeautifulComponent : GH_Component
 
     /// <summary>
     /// Heals inline widget params lost during deserialization. Files saved without registered widget
-    /// proxies (see <see cref="WidgetParamProxies"/>) deserialized variable-parameter components with
+    /// proxies deserialized variable-parameter components with
     /// <c>Param_GenericObject</c> in place of the toggles/dropdowns; a resave baked those in. After
     /// base.Read, any input that matches a ctor-built widget by name but lost the widget type is
     /// swapped back to the ctor instance (nickname + wires carried over). Fixed components read their

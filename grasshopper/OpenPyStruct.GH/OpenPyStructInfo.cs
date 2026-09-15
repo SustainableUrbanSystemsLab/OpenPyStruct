@@ -19,14 +19,18 @@ public class OpenPyStructInfo : GH_AssemblyInfo
 }
 
 /// <summary>
-/// Runs once when Grasshopper loads the .gha: registers the inline widget parameter proxies so
-/// saved documents deserialize the toggles/dropdowns, and orders the ribbon sub-tabs.
+/// Runs once when Grasshopper loads the .gha: sets the ribbon tab's short name and icon.
+/// <para>
+/// No widget-parameter proxy registration here, unlike Eddy3D. Eddy3D keeps GH_ToggleParam and
+/// GH_DropdownParam in a plain DLL that Grasshopper never scans, so it must register them by hand.
+/// In this plugin they live in the .gha itself and Grasshopper's own scan registers them; doing it
+/// here as well ran BEFORE that scan and produced a "Component ID conflict" on every load.
+/// </para>
 /// </summary>
 public class OpenPyStructPriority : GH_AssemblyPriority
 {
     public override GH_LoadingInstruction PriorityLoad()
     {
-        WidgetParamProxies.Register();
         var server = Grasshopper.Instances.ComponentServer;
         server.AddCategoryShortName(Strings.Category, "OPS");
         server.AddCategorySymbolName(Strings.Category, 'O');

@@ -7,7 +7,10 @@ Eddy3D **without** referencing its assemblies. Each file carries an "Adapted fro
 
 Edits on copy: namespace `GUI` → `OpenPyStruct.GH.GUI`; the parameter category is
 `OpenPyStruct`; the triangle-picker widget, the Eto library browser dialog and Eddy3D's docs
-link were removed (the docs menu item points at `Docs.cs` here).
+link were removed (the docs menu item points at `Docs.cs` here). `WidgetParamProxies.cs` was
+dropped: Eddy3D needs it because its GUI is a plain DLL Grasshopper never scans, but these
+parameters live inside the `.gha`, where registering them by hand collides with Grasshopper's own
+scan ("Component ID conflict").
 
 ## Licensing
 
