@@ -19,6 +19,12 @@ namespace OpenPyStruct.GH.CMP;
 /// </summary>
 public class BeamModelCMP : GH_BeautifulComponent
 {
+    /// <summary>What the beam rests on when no support points are wired.</summary>
+    private static readonly string[] Schemes =
+    {
+        "Simply supported", "Cantilever", "Propped cantilever", "Fixed both ends", "Continuous on rollers",
+    };
+
     public BeamModelCMP() : base("Beam Model", "Beam",
         "A straight beam discretized into equal elements, with pin/roller/fixed supports snapped "
         + "to the nearest node. Units: metres. Draw the beam horizontally (gravity is world -Z).",
@@ -36,15 +42,21 @@ public class BeamModelCMP : GH_BeautifulComponent
         pm.AddCurveParameter("Axis", "Axis", "The beam axis (a line). Its length is the span.", GH_ParamAccess.item);
         pm.AddIntegerParameter("Elements", "N", "Number of equal elements. The scripts use 100; "
             + "a trained surrogate only accepts the element count it was trained on.", GH_ParamAccess.item, 100);
-        pm.AddPointParameter("Pins", "Pins", "Pin supports (x and y restrained). Default when nothing "
-            + "is wired: a pin at the start.", GH_ParamAccess.list);
+        pm.AddParameter(new GH_DropdownParam(Schemes, "Scheme", "Scheme",
+            "Support scheme used when NO support points are wired.\n"
+            + "Simply supported: pin at the start, roller at the end (the scripts' beam).\n"
+            + "Cantilever: fixed at the start, free end.\n"
+            + "Propped cantilever: fixed at the start, roller at the end.\n"
+            + "Fixed both ends. Continuous on rollers: pin at the start, rollers at the quarter points and the end.\n"
+            + "Wire any Pins/Rollers/Fixed points and the scheme is ignored.", this, defaultItem: Schemes[0]));
         pm[2].Optional = true;
-        pm.AddPointParameter("Rollers", "Rollers", "Roller supports (y restrained). Default when nothing "
-            + "is wired: a roller at the end.", GH_ParamAccess.list);
+        pm.AddPointParameter("Pins", "Pins", "Pin supports (x and y restrained).", GH_ParamAccess.list);
         pm[3].Optional = true;
+        pm.AddPointParameter("Rollers", "Rollers", "Roller supports (y restrained).", GH_ParamAccess.list);
+        pm[4].Optional = true;
         pm.AddPointParameter("Fixed", "Fixed", "Fixed supports (x, y and rotation restrained), e.g. a cantilever root.",
             GH_ParamAccess.list);
-        pm[4].Optional = true;
+        pm[5].Optional = true;
     }
 
     protected override void RegisterOutputParams(GH_OutputParamManager pm)
@@ -62,7 +74,8 @@ public class BeamModelCMP : GH_BeautifulComponent
         var pins = new List<Point3d>(); var rollers = new List<Point3d>(); var fixeds = new List<Point3d>();
         if (!da.GetData(0, ref axis) || axis == null) { Error("Wire the beam axis."); return; }
         da.GetData(1, ref n);
-        da.GetDataList(2, pins); da.GetDataList(3, rollers); da.GetDataList(4, fixeds);
+        da.GetDataList(3, pins); da.GetDataList(4, rollers); da.GetDataList(5, fixeds);
+        var scheme = this.Selected(2, Schemes[0]);
 
         if (n < 1) { Error("Elements must be at least 1."); return; }
         var length = axis.GetLength();
@@ -93,8 +106,17 @@ public class BeamModelCMP : GH_BeautifulComponent
         var fixedX = fixeds.Select(Along).ToList();
         if (pinX.Count == 0 && rollerX.Count == 0 && fixedX.Count == 0)
         {
-            pinX.Add(0.0); rollerX.Add(length);
-            AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, "No supports wired: simply supported (pin at start, roller at end).");
+            switch (scheme)
+            {
+                case "Cantilever": fixedX.Add(0.0); break;
+                case "Propped cantilever": fixedX.Add(0.0); rollerX.Add(length); break;
+                case "Fixed both ends": fixedX.Add(0.0); fixedX.Add(length); break;
+                case "Continuous on rollers":
+                    pinX.Add(0.0); rollerX.Add(length / 4); rollerX.Add(length / 2); rollerX.Add(3 * length / 4); rollerX.Add(length);
+                    break;
+                default: pinX.Add(0.0); rollerX.Add(length); break;
+            }
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, $"No support points wired: {scheme.ToLowerInvariant()}.");
         }
 
         BeamBuilder.Result built;

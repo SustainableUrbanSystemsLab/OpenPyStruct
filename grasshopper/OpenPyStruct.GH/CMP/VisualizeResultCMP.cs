@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using Grasshopper.Kernel;
+using OpenPyStruct.Core.Contract;
 using OpenPyStruct.Core.Results;
 using OpenPyStruct.GH.GUI;
 using OpenPyStruct.GH.Types;
@@ -17,6 +18,8 @@ namespace OpenPyStruct.GH.CMP;
 /// </summary>
 public class VisualizeResultCMP : GH_BeautifulComponent
 {
+    private static readonly string[] ColorBy = { "Moment of inertia", "Section depth", "Bending moment", "Shear force", "Axial force" };
+
     public VisualizeResultCMP() : base("Visualize Result", "VizResult",
         "Sections sized by I (rectangle of the given width, depth = (12·I/b)^(1/3)) and coloured by I, "
         + "plus moment and shear diagrams and the deflected shape of one load case. Scales of 0 fit "
@@ -37,9 +40,14 @@ public class VisualizeResultCMP : GH_BeautifulComponent
         pm.AddNumberParameter("Width", "b", "Section width for the depth-from-I drawing, m.", GH_ParamAccess.item, 0.3);
         pm.AddNumberParameter("Diagram scale", "Scale", "Metres of offset per N·m (moment) and per N (shear). 0 = auto.", GH_ParamAccess.item, 0.0);
         pm.AddNumberParameter("Deflection scale", "DefScale", "Displacement magnification. 0 = auto.", GH_ParamAccess.item, 0.0);
-        pm.AddIntervalParameter("Range", "Range", "I range mapped onto the colour ramp. Unwired: fit to the data. "
-            + "Pin it to compare two runs on one scale.", GH_ParamAccess.item);
+        pm.AddParameter(new GH_DropdownParam(ColorBy, "Colour by", "Colour",
+            "What the section colours mean. Moment of inertia is the design result; Section depth is its drawn "
+            + "proxy; Bending moment, Shear force and Axial force are the chosen case's peak |value| per element.",
+            this, defaultItem: ColorBy[0]));
         pm[5].Optional = true;
+        pm.AddIntervalParameter("Range", "Range", "Value range mapped onto the colour ramp, in the colour-by quantity's "
+            + "unit. Unwired: fit to the data. Pin it to compare two runs on one scale.", GH_ParamAccess.item);
+        pm[6].Optional = true;
     }
 
     protected override void RegisterOutputParams(GH_OutputParamManager pm)
@@ -50,7 +58,7 @@ public class VisualizeResultCMP : GH_BeautifulComponent
         pm.AddCurveParameter("Moment", "Moment", "Moment diagram, one closed polyline per element (sagging drawn on the 'up' side).", GH_ParamAccess.list);
         pm.AddCurveParameter("Shear", "Shear", "Shear diagram, one closed polyline per element.", GH_ParamAccess.list);
         pm.AddCurveParameter("Deflected", "Deflected", "Deflected shape, one line per element.", GH_ParamAccess.list);
-        pm.AddIntervalParameter("Range", "Range", "The I range used for the colours, for a legend.", GH_ParamAccess.item);
+        pm.AddIntervalParameter("Range", "Range", "The value range used for the colours (in the colour-by quantity's unit), for a legend.", GH_ParamAccess.item);
         pm.AddTextParameter("Scales", "Scales", "The diagram and deflection scales actually used.", GH_ParamAccess.item);
     }
 
@@ -61,7 +69,8 @@ public class VisualizeResultCMP : GH_BeautifulComponent
         var range = Interval.Unset;
         if (!da.GetData(0, ref run) || run == null) { Error("Wire a Result from Optimize or Predict."); return; }
         da.GetData(1, ref caseIndex); da.GetData(2, ref width); da.GetData(3, ref scale); da.GetData(4, ref defScale);
-        var hasRange = da.GetData(5, ref range) && range.IsValid && range.Length > 0;
+        var hasRange = da.GetData(6, ref range) && range.IsValid && range.Length > 0;
+        var colorBy = this.Selected(5, ColorBy[0]);
 
         var model = run.Model;
         var I = run.Result.I;
@@ -70,15 +79,27 @@ public class VisualizeResultCMP : GH_BeautifulComponent
         if (width <= 0) { Error("Width must be positive."); return; }
 
         var depths = SectionShape.Depths(I, width);
-        var min = hasRange ? range.Min : I.Min();
-        var max = hasRange ? range.Max : I.Max();
+
+        // The colour field: I by default, else the chosen case's peak per element.
+        double[] field = I;
+        CaseResult colorCase = run.Result.Cases.Count > 0 && caseIndex >= 0 && caseIndex < run.Result.Cases.Count ? run.Result.Cases[caseIndex] : null;
+        switch (colorBy)
+        {
+            case "Section depth": field = depths; break;
+            case "Bending moment": if (colorCase != null) field = PeakAbs(colorCase.MomentI, colorCase.MomentJ); break;
+            case "Shear force": if (colorCase != null) field = PeakAbs(colorCase.ShearI, colorCase.ShearJ); break;
+            case "Axial force": if (colorCase != null) field = colorCase.Axial.Select(Math.Abs).ToArray(); break;
+        }
+        if (field.Length != I.Length) { Error("The colour field does not match the element count."); return; }
+        var min = hasRange ? range.Min : field.Min();
+        var max = hasRange ? range.Max : field.Max();
         if (max <= min) max = min + 1e-12;
 
         var meshes = new List<Mesh>(I.Length);
         var colors = new List<Color>(I.Length);
         for (var e = 0; e < I.Length; e++)
         {
-            var color = Ramp(SectionShape.Normalize(I[e], min, max));
+            var color = Ramp(SectionShape.Normalize(field[e], min, max));
             colors.Add(color);
             meshes.Add(Box(model.ElementStart(e), model.ElementEnd(e), model.ElementPerp[e], model.Normal, depths[e], width, color));
         }
@@ -108,7 +129,14 @@ public class VisualizeResultCMP : GH_BeautifulComponent
         da.SetDataList(5, deflected);
         da.SetData(7, $"moment {mScale:0.###e0} m/(N·m), shear {vScale:0.###e0} m/N, deflection ×{dScale:0.#}; "
                       + $"|M|max {mMax / 1e3:0.#} kN·m, |V|max {vMax / 1e3:0.#} kN, |u|max {dMax * 1e3:0.#} mm");
-        Message = c.Name;
+        Message = $"{c.Name} · {colorBy.ToLowerInvariant()}";
+    }
+
+    private static double[] PeakAbs(double[] a, double[] b)
+    {
+        var peak = new double[a.Length];
+        for (var i = 0; i < a.Length; i++) peak[i] = Math.Max(Math.Abs(a[i]), Math.Abs(b[i]));
+        return peak;
     }
 
     private static List<Curve> Diagram(ModelDef model, double[][] ends, double scale)

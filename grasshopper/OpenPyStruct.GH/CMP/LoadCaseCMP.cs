@@ -18,6 +18,8 @@ namespace OpenPyStruct.GH.CMP;
 /// </summary>
 public class LoadCaseCMP : GH_BeautifulComponent
 {
+    private static readonly string[] Scopes = { "Horizontal members", "All members", "Selected members" };
+
     public LoadCaseCMP() : base("Load Case", "Loads",
         "Point loads (N, as vectors: -Z is gravity) snapped to the nearest node, plus a uniform "
         + "load (N/m, negative = downward) on the chosen members — all horizontal members of a frame, "
@@ -42,9 +44,14 @@ public class LoadCaseCMP : GH_BeautifulComponent
         pm.AddNumberParameter("UDL", "UDL", "Uniform load in N/m, negative downward (the scripts use -5000 "
             + "on a beam, -10000 on frame beams).", GH_ParamAccess.item, 0.0);
         pm[3].Optional = true;
-        pm.AddCurveParameter("Members", "Members", "Members the UDL applies to (matched by nearest element). "
-            + "Unwired: every element of a beam, every horizontal member of a frame.", GH_ParamAccess.list);
+        pm.AddParameter(new GH_DropdownParam(Scopes, "UDL on", "On",
+            "Which members carry the UDL. Horizontal members: beams of a frame, or the whole of a beam "
+            + "(the scripts' case). All members: columns and braces too. Selected members: the curves wired "
+            + "into Members.", this, defaultItem: Scopes[0]));
         pm[4].Optional = true;
+        pm.AddCurveParameter("Members", "Members", "Members the UDL applies to when UDL on = Selected members "
+            + "(matched by nearest element).", GH_ParamAccess.list);
+        pm[5].Optional = true;
         pm.AddTextParameter("Name", "Name", "Label for this case.", GH_ParamAccess.item, "LC1");
     }
 
@@ -62,7 +69,8 @@ public class LoadCaseCMP : GH_BeautifulComponent
         var udl = 0.0; var name = "LC1";
         if (!da.GetData(0, ref model) || model == null) { Error("Wire a model."); return; }
         da.GetDataList(1, points); da.GetDataList(2, forces); da.GetData(3, ref udl);
-        da.GetDataList(4, members); da.GetData(5, ref name);
+        da.GetDataList(5, members); da.GetData(6, ref name);
+        var scope = this.Selected(4, Scopes[0]);
 
         if (points.Count > 0 && forces.Count == 0) { Error("Points need Forces."); return; }
         if (forces.Count > 1 && forces.Count != points.Count) { Error($"{points.Count} points but {forces.Count} forces."); return; }
@@ -95,7 +103,12 @@ public class LoadCaseCMP : GH_BeautifulComponent
         if (udl != 0.0)
         {
             IEnumerable<int> elements;
-            if (members.Count > 0)
+            if (scope == "Selected members" && members.Count == 0)
+            {
+                Error("UDL on = Selected members, but no Members are wired.");
+                return;
+            }
+            if (scope == "Selected members")
             {
                 var set = new SortedSet<int>();
                 foreach (var c in members)
@@ -108,7 +121,7 @@ public class LoadCaseCMP : GH_BeautifulComponent
                 }
                 elements = set;
             }
-            else if (model.IsBeam || model.Kinds == null)
+            else if (scope == "All members" || model.IsBeam || model.Kinds == null)
                 elements = Enumerable.Range(0, model.ElementCount);
             else
                 elements = Enumerable.Range(0, model.ElementCount).Where(e => model.Kinds[e] == FrameBuilder.MemberKind.Beam);

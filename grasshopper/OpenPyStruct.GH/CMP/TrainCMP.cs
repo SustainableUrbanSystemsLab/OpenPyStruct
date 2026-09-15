@@ -14,6 +14,14 @@ namespace OpenPyStruct.GH.CMP;
 public class TrainCMP : RunComponentBase
 {
     private static readonly string[] Kinds = { "fnn", "pinn" };
+
+    /// <summary>Each script's hyperparameters, used for whatever is left unwired.</summary>
+    private sealed record Hyper(int Hidden, int Blocks, double Dropout, int Epochs, int Batch, int Patience, double Lr, double Wd, double C);
+    private static readonly Dictionary<string, Hyper> ScriptDefaults = new()
+    {
+        ["fnn"] = new Hyper(128, 3, 0.5, 500, 128, 10, 2e-4, 1e-2, 1.0),
+        ["pinn"] = new Hyper(350, 2, 0.5, 500, 128, 10, 5e-4, 1e-3, 0.5),
+    };
     private string _dataset;
 
     public TrainCMP() : base("Train Surrogate", "Train",
@@ -31,18 +39,31 @@ public class TrainCMP : RunComponentBase
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {
         pm.AddTextParameter("Dataset", "Dataset", "Path of dataset.json from Generate Data (or StructDataLite.json).", GH_ParamAccess.item);
-        pm.AddParameter(new GH_DropdownParam(Kinds, "Kind", "Kind", "fnn: predicts I. pinn: predicts I, deflections and rotations with a physics-consistency loss.", this, defaultItem: Kinds[0]));
+        pm.AddParameter(new GH_DropdownParam(Kinds, "Kind", "Kind",
+            "fnn: predicts I (OpenPyStruct_FNN_MultiCase). pinn: predicts I, deflections and rotations with a "
+            + "physics-consistency loss (OpenPyStruct_PINN_MultiCase). Every unwired hyperparameter below takes "
+            + "that script's value: fnn 128 units × 3 blocks, lr 2e-4, wd 1e-2, c 1.0; pinn 350 × 2, lr 5e-4, wd 1e-3, c 0.5.",
+            this, defaultItem: Kinds[0]));
         pm[1].Optional = true;
         pm.AddIntegerParameter("Cases", "Cases", "Load cases grouped per training sample (n_cases). Predict accepts up to this many.", GH_ParamAccess.item, 6);
-        pm.AddNumberParameter("c", "c", "Label aggregation: target I = mean + c·std across the grouped cases (higher = more conservative).", GH_ParamAccess.item, 1.0);
-        pm.AddIntegerParameter("Hidden", "Hidden", "Hidden units.", GH_ParamAccess.item, 128);
-        pm.AddIntegerParameter("Blocks", "Blocks", "Residual blocks.", GH_ParamAccess.item, 3);
-        pm.AddNumberParameter("Dropout", "Dropout", "Dropout rate.", GH_ParamAccess.item, 0.5);
-        pm.AddIntegerParameter("Epochs", "Epochs", "Maximum epochs.", GH_ParamAccess.item, 500);
-        pm.AddIntegerParameter("Batch", "Batch", "Batch size.", GH_ParamAccess.item, 128);
-        pm.AddIntegerParameter("Patience", "Patience", "Early-stopping patience on validation loss.", GH_ParamAccess.item, 10);
-        pm.AddNumberParameter("Learning rate", "lr", "Adam learning rate.", GH_ParamAccess.item, 2e-4);
-        pm.AddNumberParameter("Weight decay", "wd", "L2 regularization.", GH_ParamAccess.item, 1e-2);
+        pm.AddNumberParameter("c", "c", "Label aggregation: target I = mean + c·std across the grouped cases (higher = more conservative). Unwired: the kind's.", GH_ParamAccess.item);
+        pm[3].Optional = true;
+        pm.AddIntegerParameter("Hidden", "Hidden", "Hidden units. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[4].Optional = true;
+        pm.AddIntegerParameter("Blocks", "Blocks", "Residual blocks. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[5].Optional = true;
+        pm.AddNumberParameter("Dropout", "Dropout", "Dropout rate. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[6].Optional = true;
+        pm.AddIntegerParameter("Epochs", "Epochs", "Maximum epochs. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[7].Optional = true;
+        pm.AddIntegerParameter("Batch", "Batch", "Batch size. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[8].Optional = true;
+        pm.AddIntegerParameter("Patience", "Patience", "Early-stopping patience on validation loss. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[9].Optional = true;
+        pm.AddNumberParameter("Learning rate", "lr", "Adam learning rate. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[10].Optional = true;
+        pm.AddNumberParameter("Weight decay", "wd", "L2 regularization. Unwired: the kind's.", GH_ParamAccess.item);
+        pm[11].Optional = true;
         pm.AddIntegerParameter("Seed", "Seed", "Random seed.", GH_ParamAccess.item, 0);
         pm.AddGenericParameter("Engine", "Engine", "Unwired: defaults. Turn GPU on with the CUDA image for large sets.", GH_ParamAccess.item);
         pm[13].Optional = true;
@@ -64,15 +85,16 @@ public class TrainCMP : RunComponentBase
     {
         doc = null; engine = null; folder = null; model = null; key = 0;
         string dataset = null;
-        int cases = 6, hidden = 128, blocks = 3, epochs = 500, batch = 128, patience = 10, seed = 0;
-        double c = 1.0, dropout = 0.5, lr = 2e-4, wd = 1e-2;
+        var kind = this.Selected(1, Kinds[0]);
+        var h = ScriptDefaults.TryGetValue(kind, out var known) ? known : ScriptDefaults["fnn"];
+        int cases = 6, hidden = h.Hidden, blocks = h.Blocks, epochs = h.Epochs, batch = h.Batch, patience = h.Patience, seed = 0;
+        double c = h.C, dropout = h.Dropout, lr = h.Lr, wd = h.Wd;
         if (!da.GetData(0, ref dataset) || string.IsNullOrWhiteSpace(dataset)) { Error("Wire the dataset path."); return false; }
         if (!System.IO.File.Exists(dataset)) { Error($"Dataset not found: {dataset}"); return false; }
         da.GetData(2, ref cases); da.GetData(3, ref c); da.GetData(4, ref hidden); da.GetData(5, ref blocks);
         da.GetData(6, ref dropout); da.GetData(7, ref epochs); da.GetData(8, ref batch); da.GetData(9, ref patience);
         da.GetData(10, ref lr); da.GetData(11, ref wd); da.GetData(12, ref seed);
         da.GetData(13, ref engine); da.GetData(14, ref folder);
-        var kind = Params.Input[1] is GH_DropdownParam dd ? dd.SelectedValues.FirstOrDefault() ?? Kinds[0] : Kinds[0];
         if (cases < 1 || hidden < 1 || blocks < 0 || epochs < 1 || batch < 1 || patience < 1) { Error("Cases, Hidden, Epochs, Batch and Patience must be positive."); return false; }
 
         engine ??= DefaultEngine();

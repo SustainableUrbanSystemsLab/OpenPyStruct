@@ -33,17 +33,26 @@ def shear_modulus(E: float, nu: float) -> float:
 
 
 def loss_terms(I: torch.Tensor, analyses: Sequence[Analysis], E: float, G: float, k: float,
-               alpha_moment: float, alpha_shear: float):
-    """(total, primary, bending, shear) for the current I and the frozen section forces."""
+               alpha_moment: float, alpha_shear: float, combination: str = "sum"):
+    """(total, primary, bending, shear) for the current I and the frozen section forces.
+
+    ``combination`` is how load cases combine: "sum" adds every case's energies; "envelope" keeps,
+    per element, the largest bending and the largest shear energy over the cases.
+    """
+    if combination not in ("sum", "envelope"):
+        raise ValueError(f"combination must be 'sum' or 'envelope', got {combination!r}")
     primary = torch.sum(I)
-    bending = torch.zeros((), dtype=I.dtype)
-    shear = torch.zeros((), dtype=I.dtype)
     A_local = k * torch.sqrt(I)
-    for a in analyses:
-        M = torch.as_tensor(a.M_i, dtype=I.dtype)
-        V = torch.as_tensor(a.V_i, dtype=I.dtype)
-        bending = bending + torch.sum(M * M / (2.0 * E * I + 1e-6))
-        shear = shear + torch.sum(V * V / (G * A_local))
+    M2 = torch.stack([torch.as_tensor(a.M_i, dtype=I.dtype) ** 2 for a in analyses])   # (cases, elems)
+    V2 = torch.stack([torch.as_tensor(a.V_i, dtype=I.dtype) ** 2 for a in analyses])
+    if combination == "envelope":
+        M2 = M2.max(dim=0).values
+        V2 = V2.max(dim=0).values
+    else:
+        M2 = M2.sum(dim=0)
+        V2 = V2.sum(dim=0)
+    bending = torch.sum(M2 / (2.0 * E * I + 1e-6))
+    shear = torch.sum(V2 / (G * A_local))
     return (primary + alpha_moment * bending + alpha_shear * shear,
             primary, alpha_moment * bending, alpha_shear * shear)
 
@@ -81,6 +90,7 @@ def optimize(model: Model, load_cases: List[LoadCase], material: dict, optimizer
     tol = float(optimizer["tolerance"])
     patience = int(optimizer["patience"])
     I_min = float(optimizer.get("I_min", 1e-8))
+    combination = str(optimizer.get("combination", "sum"))
 
     m = model.n_elements
     init = np.full(m, I0) if I_init is None else np.asarray(I_init, dtype=float)
@@ -99,7 +109,7 @@ def optimize(model: Model, load_cases: List[LoadCase], material: dict, optimizer
         opt.zero_grad()
         I_np = I.detach().cpu().numpy()
         analyses = [analyze(model, lc, E, A, I_np, backend=backend) for lc in load_cases]
-        total, primary, bending, shear = loss_terms(I, analyses, E, G, k, alpha_m, alpha_s)
+        total, primary, bending, shear = loss_terms(I, analyses, E, G, k, alpha_m, alpha_s, combination)
         total.backward()
         opt.step()
         sched.step()
@@ -132,6 +142,7 @@ def optimize(model: Model, load_cases: List[LoadCase], material: dict, optimizer
         "stopped_early": stopped_early,
         "best_loss": best if best != float("inf") else None,
         "loss_history": history,
+        "combination": combination,
         "cases": [dict(name=lc.name, **a.to_json()) for lc, a in zip(load_cases, final)],
     }
 

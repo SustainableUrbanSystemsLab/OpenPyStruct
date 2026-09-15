@@ -42,3 +42,23 @@ def test_multi_case_envelope_needs_more_I_than_single():
     both = optimize(model, [lc1, lc2], DEFAULT_MATERIAL, opt, backend="numpy")
     assert np.sum(both["I"]) > np.sum(single["I"])
     assert len(both["cases"]) == 2
+
+
+def test_envelope_is_bounded_by_sum_and_single_cases():
+    model, lc1 = _small_case()
+    lc2 = beam_load_case(model, [10.0], [-3e5])
+    opt = dict(DEFAULT_OPTIMIZER, epochs=40, patience=100)
+    total = optimize(model, [lc1, lc2], DEFAULT_MATERIAL, opt, backend="numpy")
+    env = optimize(model, [lc1, lc2], DEFAULT_MATERIAL, dict(opt, combination="envelope"), backend="numpy")
+    single = optimize(model, [lc2], DEFAULT_MATERIAL, opt, backend="numpy")
+    assert env["combination"] == "envelope"
+    # the envelope never asks for more than the sum, and at least as much as any one case
+    assert np.sum(env["I"]) <= np.sum(total["I"]) + 1e-9
+    assert np.sum(env["I"]) >= np.sum(single["I"]) - 1e-6
+
+
+def test_unknown_combination_is_rejected():
+    import pytest
+    model, lc = _small_case()
+    with pytest.raises(ValueError, match="combination"):
+        optimize(model, [lc], DEFAULT_MATERIAL, dict(DEFAULT_OPTIMIZER, epochs=1, combination="max"), backend="numpy")

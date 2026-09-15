@@ -84,26 +84,33 @@ its menu, which lands on the matching heading below.
 
 ### Beam Model
 A straight beam from a curve, split into N equal elements. Pin / Roller / Fixed points snap to
-the nearest node; nothing wired means simply supported. Draw beams horizontally: gravity is
+the nearest node. With no points wired the *Scheme* dropdown decides: simply supported (the
+scripts' beam), cantilever, propped cantilever, fixed both ends, or continuous on rollers. Draw beams horizontally: gravity is
 world −Z, the engine's y is up, and the beam runs along the curve's length. This is the only
 model the ML components accept.
 
 ### Frame Model
 A planar frame from lines or polylines. Endpoints within *Tolerance* merge into nodes, members are
 classified column / beam / brace by angle, and the vertical analysis plane is fitted through the
-geometry (or given as *Plane*). Out-of-plane geometry is projected with a warning.
+geometry (or given as *Plane*). Out-of-plane geometry is projected with a warning. With no support
+points wired, *Base* fixes, pins or puts rollers under every lowest-level node.
 
 ### Load Case
 Point loads as force vectors (N) at points, snapped to nodes; a uniform load (N/m, negative down)
-on the chosen members — all elements of a beam or all horizontal members of a frame by default.
+on the members *UDL on* selects: horizontal members (a whole beam, or a frame's beams), all
+members, or the curves wired into *Members*.
 The in-plane part of a vector is used; an out-of-plane component raises a warning.
 
 ### Material
-E, ν, A, I₀ (starting I) and k (the shear-area proxy A = k√I). Defaults are the scripts' steel.
+A *Preset* sets E and ν — the scripts' 200 GPa steel, S355, aluminium 6061, concrete C30/37,
+glulam GL24h, or Custom — and wired E / ν override it. A, I₀ (starting I) and k (the shear-area
+proxy A = k√I) are plain inputs.
 
 ### Optimizer Settings
-Epochs, learning rate, decay, the two energy weights α_M and α_V, the early-stopping tolerance and
-patience, and the I floor. Shared by Optimize and Generate Data.
+*Preset* starts from one of the three scripts' parameter sets (Beam, Frame, Training data); any
+wired input overrides it. *Combination* says how several load cases combine: Sum adds every case's
+energies (the scripts' reading), Envelope designs each element for its worst case. Shared by
+Optimize and Generate Data.
 
 ### Engine
 Image name, CLI path, CPU limit, GPU, platform, FE backend, runs folder, timeout. *Check* probes
@@ -121,18 +128,23 @@ have the model's element count; fewer load cases than the model's cases-per-samp
 
 ### Generate Data
 Random point-load cases on a beam, each optimized, into `dataset.json` in the run folder
-(the `StructDataLite.json` layout plus the multicore script's extra fields).
+(the `StructDataLite.json` layout plus the multicore script's extra fields). *Scale* picks the
+sample count when *Samples* is unwired: smoke test (50), development (1 000) or paper (100 000).
 
 ### Train Surrogate
-FNN (residual MLP predicting I) or PINN (also deflections and rotations, with a physics loss)
-on a dataset. Writes `model.pt`: architecture, feature scalers and weights in one file.
+*Kind* is FNN (residual MLP predicting I) or PINN (also deflections and rotations, with a physics
+loss). Every unwired hyperparameter takes that script's value — fnn 128 × 3, lr 2e-4; pinn 350 × 2,
+lr 5e-4 — so switching Kind switches the whole recipe. Writes `model.pt`: architecture, feature
+scalers and weights in one file.
 
 ### Deconstruct Result
 I per element; axial, shear and moment at both element ends; displacement vectors and rotations
-per node; the loss history. Sign convention: sagging-positive moment, V = dM/dx, tension positive.
+per node; the loss history. *Units* gives forces and lengths in N·m, kN·m or kN·mm (I stays in m⁴).
+Sign convention: sagging-positive moment, V = dM/dx, tension positive.
 
 ### Visualize Result
-A box per element with depth (12·I/b)^(1/3) for the chosen width b, coloured by I over a range
+A box per element with depth (12·I/b)^(1/3) for the chosen width b, coloured by what *Colour by*
+picks — I, section depth, or the case's peak bending moment, shear or axial force — over a range
 you can pin; moment and shear diagrams as offset polygons per element; the deflected shape.
 Scales of 0 fit the diagrams to a tenth of the model.
 

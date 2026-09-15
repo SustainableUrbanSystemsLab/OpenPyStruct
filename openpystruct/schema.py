@@ -71,6 +71,10 @@ DEFAULT_OPTIMIZER = {
     "tolerance": 1e-2,
     "patience": 10,
     "I_min": 1e-8,
+    # how several load cases combine: "sum" adds every case's energies (the scripts' multi-case
+    # reading); "envelope" takes, per element, the worst case's bending and shear energy, so the
+    # design is governed by whichever case hurts each element most.
+    "combination": "sum",
 }
 
 

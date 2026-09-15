@@ -13,6 +13,12 @@ namespace OpenPyStruct.GH.CMP;
 /// <summary>Training-data generation: many random beam load cases, each optimized, into one JSON dataset.</summary>
 public class GenerateDataCMP : RunComponentBase
 {
+    /// <summary>Sample counts for the unwired Samples input.</summary>
+    private static readonly (string Name, int Samples)[] Scales =
+    {
+        ("Smoke test (50)", 50), ("Development (1 000)", 1000), ("Paper (100 000)", 100000),
+    };
+
     public GenerateDataCMP() : base("Generate Data", "GenData",
         "Build a training set for the surrogates (OpenPyStruct_BeamOpt_training_MultiCore): N random "
         + "point-load cases on a beam, each optimized, written as dataset.json in the run folder. "
@@ -27,14 +33,20 @@ public class GenerateDataCMP : RunComponentBase
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {
-        pm.AddIntegerParameter("Samples", "Samples", "Number of samples. The paper's sets are 10⁴–10⁵.", GH_ParamAccess.item, 500);
+        pm.AddParameter(new GH_DropdownParam(Scales.Select(s => s.Name), "Scale", "Scale",
+            "How many samples when Samples is unwired. Smoke test proves the pipeline in minutes; Development "
+            + "is enough to train something; Paper is the published set size and takes hours on many cores.",
+            this, defaultItem: Scales[0].Name));
+        pm[0].Optional = true;
+        pm.AddIntegerParameter("Samples", "Samples", "Number of samples; overrides Scale.", GH_ParamAccess.item);
+        pm[1].Optional = true;
         pm.AddIntegerParameter("Elements", "N", "Elements per beam — Predict will only accept beams with this count.", GH_ParamAccess.item, 100);
         pm.AddNumberParameter("Length", "L", "Beam length, m (the maximum when geometry is randomized).", GH_ParamAccess.item, 200.0);
         pm.AddNumberParameter("Rollers", "Rollers", "Roller x-positions, m (a pin sits at x = 0). Ignored when randomized.",
             GH_ParamAccess.list, new List<double> { 18, 58, 138, 168, 198 });
         pm.AddParameter(new GH_ToggleParam("Randomize", "Randomize",
             "Random length in [15 m, L] and 1..Max rollers per sample, instead of the fixed layout.", this));
-        pm[4].Optional = true;
+        pm[5].Optional = true;
         pm.AddIntegerParameter("Max rollers", "MaxR", "Upper bound on rollers when randomized.", GH_ParamAccess.item, 4);
         pm.AddIntegerParameter("Max forces", "MaxF", "1..this many point loads per sample.", GH_ParamAccess.item, 4);
         pm.AddIntervalParameter("Force range", "F", "Point-load magnitude range, N (negative = down).",
@@ -43,14 +55,14 @@ public class GenerateDataCMP : RunComponentBase
         pm.AddIntegerParameter("Workers", "Workers", "Parallel processes inside the container.", GH_ParamAccess.item, 4);
         pm.AddIntegerParameter("Seed", "Seed", "Random seed.", GH_ParamAccess.item, 0);
         pm.AddGenericParameter("Material", "Material", "Unwired: defaults.", GH_ParamAccess.item);
-        pm[11].Optional = true;
+        pm[12].Optional = true;
         pm.AddGenericParameter("Settings", "Settings", "Optimizer settings per sample. Unwired: the training script's "
             + "(600 epochs, tolerance 5e-3, patience 5).", GH_ParamAccess.item);
-        pm[12].Optional = true;
-        pm.AddGenericParameter("Engine", "Engine", "Unwired: defaults.", GH_ParamAccess.item);
         pm[13].Optional = true;
-        pm.AddTextParameter("Folder", "Folder", "Run folder; dataset.json is written here.", GH_ParamAccess.item);
+        pm.AddGenericParameter("Engine", "Engine", "Unwired: defaults.", GH_ParamAccess.item);
         pm[14].Optional = true;
+        pm.AddTextParameter("Folder", "Folder", "Run folder; dataset.json is written here.", GH_ParamAccess.item);
+        pm[15].Optional = true;
         AddRunInput(pm);
     }
 
@@ -71,10 +83,13 @@ public class GenerateDataCMP : RunComponentBase
         var randomize = false;
         var range = new Rhino.Geometry.Interval(-355857, -35585.7);
         MaterialDef material = null; OptimizerDef settings = null;
-        da.GetData(0, ref samples); da.GetData(1, ref n); da.GetData(2, ref length); da.GetDataList(3, rollers);
-        da.GetData(4, ref randomize); da.GetData(5, ref maxR); da.GetData(6, ref maxF); da.GetData(7, ref range);
-        da.GetData(8, ref udl); da.GetData(9, ref workers); da.GetData(10, ref seed);
-        da.GetData(11, ref material); da.GetData(12, ref settings); da.GetData(13, ref engine); da.GetData(14, ref folder);
+        var scaleName = this.Selected(0, Scales[0].Name);
+        samples = Scales.FirstOrDefault(sc => sc.Name == scaleName).Samples;
+        if (samples == 0) samples = Scales[0].Samples;
+        da.GetData(1, ref samples); da.GetData(2, ref n); da.GetData(3, ref length); da.GetDataList(4, rollers);
+        da.GetData(5, ref randomize); da.GetData(6, ref maxR); da.GetData(7, ref maxF); da.GetData(8, ref range);
+        da.GetData(9, ref udl); da.GetData(10, ref workers); da.GetData(11, ref seed);
+        da.GetData(12, ref material); da.GetData(13, ref settings); da.GetData(14, ref engine); da.GetData(15, ref folder);
 
         if (samples < 1 || n < 2 || length <= 0 || maxF < 1 || maxR < 1 || workers < 1) { Error("Samples, Elements (≥2), Length, Max forces, Max rollers and Workers must be positive."); return false; }
         if (!randomize && rollers.Count == 0) Warning("No rollers: every sample is a cantilever off the pin at x = 0 — unstable. Add rollers or randomize.");

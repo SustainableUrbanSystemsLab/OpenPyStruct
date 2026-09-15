@@ -17,6 +17,8 @@ namespace OpenPyStruct.GH.CMP;
 /// </summary>
 public class FrameModelCMP : GH_BeautifulComponent
 {
+    private static readonly string[] Bases = { "Fixed", "Pinned", "Rollers" };
+
     public FrameModelCMP() : base("Frame Model", "Frame",
         "A 2D frame from member lines (columns, beams, braces). Endpoints closer than the tolerance "
         + "become one node. Supports snap to the nearest node; with none given, every node on the "
@@ -44,6 +46,11 @@ public class FrameModelCMP : GH_BeautifulComponent
         pm.AddPlaneParameter("Plane", "Plane", "Analysis plane: origin and X axis define where x = 0 and "
             + "which way it runs. Leave unwired to fit one through the members.", GH_ParamAccess.item);
         pm[5].Optional = true;
+        pm.AddParameter(new GH_DropdownParam(Bases, "Base", "Base",
+            "How every node on the LOWEST level is supported when no support points are wired. Fixed is the "
+            + "frame script's choice; Pinned lets the columns rotate at the foot; Rollers restrain only "
+            + "vertically (a mechanism unless something else holds the frame sideways).", this, defaultItem: Bases[0]));
+        pm[6].Optional = true;
     }
 
     protected override void RegisterOutputParams(GH_OutputParamManager pm)
@@ -66,6 +73,7 @@ public class FrameModelCMP : GH_BeautifulComponent
         da.GetDataList(1, fixeds); da.GetDataList(2, pins); da.GetDataList(3, rollers);
         da.GetData(4, ref tol);
         var hasPlane = da.GetData(5, ref plane) && plane.IsValid;
+        var baseKind = this.Selected(6, Bases[0]);
         if (tol <= 0) { Error("Tolerance must be positive."); return; }
 
         var segments = new List<FrameBuilder.Segment>();
@@ -90,11 +98,23 @@ public class FrameModelCMP : GH_BeautifulComponent
             catch (ArgumentException ex) { Error("Plane: " + ex.Message); return; }
         }
 
+        // No support points: every lowest-level node gets the chosen base. Done here rather than by
+        // the builder's auto-fix so the kind is the user's, not always fixed.
+        if (fixeds.Count == 0 && pins.Count == 0 && rollers.Count == 0)
+        {
+            var lowest = segments.SelectMany(sg => new[] { sg.A, sg.B }).Min(v => v.Z);
+            var feet = segments.SelectMany(sg => new[] { sg.A, sg.B }).Where(v => Math.Abs(v.Z - lowest) <= tol)
+                .Select(v => new Point3d(v.X, v.Y, v.Z)).ToList();
+            if (baseKind == "Pinned") pins = feet; else if (baseKind == "Rollers") rollers = feet; else fixeds = feet;
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Remark, $"No support points wired: {feet.Count} lowest-level node(s) {baseKind.ToLowerInvariant()}.");
+            if (baseKind == "Rollers") Warning("Rollers alone cannot hold a frame sideways; add a pin or a fixed support.");
+        }
+
         FrameBuilder.Result built;
         try
         {
             built = FrameBuilder.Build(segments, fixeds.Select(V).ToList(), pins.Select(V).ToList(),
-                rollers.Select(V).ToList(), tol, analysisPlane);
+                rollers.Select(V).ToList(), tol, analysisPlane, autoFixBase: false);
         }
         catch (ArgumentException ex) { Error(ex.Message); return; }
 

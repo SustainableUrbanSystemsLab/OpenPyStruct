@@ -113,4 +113,6 @@ public sealed class OptimizerSettings
     [JsonPropertyName("tolerance")] public double Tolerance { get; set; } = 1e-2;
     [JsonPropertyName("patience")] public int Patience { get; set; } = 10;
     [JsonPropertyName("I_min")] public double IMin { get; set; } = 1e-8;
+    /// <summary>"sum" adds every load case's energies; "envelope" takes each element's worst case.</summary>
+    [JsonPropertyName("combination")] public string Combination { get; set; } = "sum";
 }
