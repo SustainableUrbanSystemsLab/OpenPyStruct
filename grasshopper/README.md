@@ -126,6 +126,25 @@ A box per element with depth (12·I/b)^(1/3) for the chosen width b, coloured by
 you can pin; moment and shear diagrams as offset polygons per element; the deflected shape.
 Scales of 0 fit the diagrams to a tenth of the model.
 
+## Icons
+
+The component icons are a vector set authored as code in [`icons/`](icons/README.md), adapted from
+Eddy3D's v4 icon system: one 24-unit canvas, two stroke weights, no effects, one motif plus at most
+one badge. Hue means physics rather than ribbon position, so the set uses three families — Structure
+amber `#b5821f` for the eight structural components, Prediction purple `#7a5af5` for the three
+surrogate components (Eddy3D's ML hue, because a trained network is the same idea in both plugins),
+and Tooling grey `#6b7580` for Engine, which is container plumbing.
+
+The motif that carries the plugin's idea is `member`: a beam or column drawn with its section
+DEPTH, because depth is what the optimizer designs. Regenerate the PNGs after changing a `def()`:
+
+```bash
+cd grasshopper/icons/src && node emit.js
+```
+
+A component's glyph is found by its display name alone, so a glyph one character off is silently
+unused; `TestIconCoverage` fails the build rather than letting that ship.
+
 ## The contract
 
 `case.json` in, `result.json` out, both versioned (`openpystruct.case/1`, `openpystruct.result/1`).

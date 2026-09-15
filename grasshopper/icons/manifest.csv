@@ -1,0 +1,14 @@
+name,tab,family,accent
+Beam_Model,1 | Model,struct,#b5821f
+Frame_Model,1 | Model,struct,#b5821f
+Load_Case,2 | Loads,struct,#b5821f
+Material,3 | Settings,struct,#b5821f
+Optimizer_Settings,3 | Settings,struct,#b5821f
+Engine,3 | Settings,tool,#6b7580
+Optimize,4 | Run,struct,#b5821f
+Predict,4 | Run,ml,#7a5af5
+Generate_Data,4 | Run,ml,#7a5af5
+Train_Surrogate,4 | Run,ml,#7a5af5
+Deconstruct_Result,5 | Results,struct,#b5821f
+Visualize_Result,5 | Results,struct,#b5821f
+OpenPyStruct,00 | Plugin,struct,#b5821f

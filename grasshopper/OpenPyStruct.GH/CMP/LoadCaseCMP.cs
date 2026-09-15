@@ -29,7 +29,7 @@ public class LoadCaseCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("148CDB19-671F-4CB8-A3B7-7CE3493C3334");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("LC", Icons.LoadsColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {

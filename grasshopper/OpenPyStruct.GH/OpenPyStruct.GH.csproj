@@ -25,6 +25,16 @@
     <PackageReference Include="Grasshopper" Version="8.27.26019.16021" ExcludeAssets="runtime" />
   </ItemGroup>
 
+  <!-- The icon set (grasshopper/icons/): one 24x24 PNG per component, embedded so Icons.For
+       resolves a glyph from the component's display name. LogicalName is flattened to
+       OpenPyStruct.Icons.<Name>.png so the lookup key is the name alone. Regenerate the PNGs with
+       icons/src/emit.js; see icons/README.md. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\icons\png24\*.png">
+      <LogicalName>OpenPyStruct.Icons.%(Filename).png</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <!-- WinForms is what Grasshopper's canvas API is written against. -->
   <PropertyGroup Condition="$(TargetFramework.Contains('-windows')) or $(TargetFramework.StartsWith('net4'))">
     <UseWindowsForms>true</UseWindowsForms>

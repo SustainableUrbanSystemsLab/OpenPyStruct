@@ -20,7 +20,7 @@ public class MaterialCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("4C701DA5-692B-4C2A-AB58-BACB59024B5C");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("Mt", Icons.SettingsColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {
@@ -65,7 +65,7 @@ public class OptimizerSettingsCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("00E00C71-1315-486A-873A-78AC82FEE870");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("Op", Icons.SettingsColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {

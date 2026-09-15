@@ -29,7 +29,7 @@ public class BeamModelCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("FA552D9D-6D28-4C2E-B977-FE9518F84D3C");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("Bm", Icons.ModelColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {

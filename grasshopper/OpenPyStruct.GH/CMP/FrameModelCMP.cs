@@ -28,7 +28,7 @@ public class FrameModelCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("22F165EF-54B9-4072-BBA4-055119504EB4");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("Fr", Icons.ModelColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {

@@ -1,59 +1,117 @@
 using System.Collections.Concurrent;
 using System.Drawing;
-using System.Drawing.Drawing2D;
+using System.IO;
+using System.Text;
 
 namespace OpenPyStruct.GH;
 
 /// <summary>
-/// Generated 24×24 icons: a rounded tile in the sub-tab's colour with a two-letter glyph. No
-/// resource files to keep in sync; a real icon set can replace this later without touching
-/// the components (they only call <see cref="For"/>).
+/// The single source of component icons: the vector set in <c>grasshopper/icons/</c>, embedded as
+/// 24x24 PNGs and resolved by the component's DISPLAY NAME.
+///
+/// <para>Why by name: the set is authored per component (<c>icons/manifest.csv</c> maps name to
+/// ribbon tab, family and accent) and every glyph file is that name, so the drawing and the
+/// component that shows it stay in lockstep with no third mapping table to drift. A component with
+/// no glyph resolves to null, which Grasshopper draws as its default box — invisible in every
+/// build, which is why <c>TestIconCoverage</c> checks the set covers every component.</para>
 /// </summary>
 public static class Icons
 {
-    private static readonly ConcurrentDictionary<string, byte[]> Cache = new();
+    private const string ResourcePrefix = "OpenPyStruct.Icons.";
 
-    public static Bitmap For(string glyph, Color tile) => Draw(glyph, tile);
+    /// <summary>The plugin's own mark: the ribbon tab icon and the assembly icon.</summary>
+    public const string PluginGlyph = "OpenPyStruct";
 
-    public static Bitmap Plugin() => Draw("OP", Color.FromArgb(52, 73, 94));
+    // Cache the raw PNG bytes, not Bitmaps: callers get a fresh Bitmap each time, because
+    // Grasshopper takes ownership of what it is handed and a shared instance would be disposed
+    // out from under the next caller.
+    private static readonly ConcurrentDictionary<string, byte[]?> Cache = new(StringComparer.Ordinal);
 
-    public static readonly Color ModelColor = Color.FromArgb(41, 128, 185);
-    public static readonly Color LoadsColor = Color.FromArgb(192, 57, 43);
-    public static readonly Color SettingsColor = Color.FromArgb(127, 140, 141);
-    public static readonly Color RunColor = Color.FromArgb(39, 174, 96);
-    public static readonly Color ResultsColor = Color.FromArgb(142, 68, 173);
-
-    private static Bitmap Draw(string glyph, Color tile)
+    /// <summary>
+    /// The icon for <paramref name="componentName"/> (a component's <c>Name</c>), or null when the
+    /// set has no glyph for it. Never throws: an icon is decoration, and a component that fails to
+    /// draw one must still load.
+    /// </summary>
+    public static Bitmap? For(string componentName)
     {
-        var bmp = new Bitmap(24, 24);
+        var bytes = BytesFor(componentName);
+        if (bytes == null) return null;
         try
         {
-            using var g = Graphics.FromImage(bmp);
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
-            using var path = Rounded(new RectangleF(1, 1, 22, 22), 5);
-            using var brush = new SolidBrush(tile);
-            g.FillPath(brush, path);
-            using var font = new Font(FontFamily.GenericSansSerif, glyph.Length > 2 ? 7f : 9f, FontStyle.Bold, GraphicsUnit.Point);
-            var size = g.MeasureString(glyph, font);
-            g.DrawString(glyph, font, Brushes.White, (24 - size.Width) / 2f, (24 - size.Height) / 2f);
+            using var ms = new MemoryStream(bytes, writable: false);
+            return new Bitmap(ms);
         }
         catch
         {
-            // An icon is decoration; a component must load without one.
+            return null;
         }
-        return bmp;
     }
 
-    private static GraphicsPath Rounded(RectangleF r, float radius)
+    public static Bitmap? Plugin() => For(PluginGlyph);
+
+    /// <summary>Raw PNG bytes for a component name, or null. Exposed for tests.</summary>
+    public static byte[]? BytesFor(string componentName)
     {
-        var p = new GraphicsPath();
-        var d = radius * 2;
-        p.AddArc(r.X, r.Y, d, d, 180, 90);
-        p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
-        p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
-        p.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
-        p.CloseFigure();
-        return p;
+        var key = ResourceKey(componentName);
+        if (key == null) return null;
+
+        return Cache.GetOrAdd(key, static k =>
+        {
+            var asm = typeof(Icons).Assembly;
+            using var stream = asm.GetManifestResourceStream(ResourcePrefix + k + ".png");
+            if (stream == null) return null;
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            return buffer.ToArray();
+        });
+    }
+
+    /// <summary>
+    /// Component display name to glyph file stem: spaces, <c>-</c> and <c>/</c> become <c>_</c>,
+    /// <c>+</c> becomes <c>Plus</c>, other punctuation is dropped and <c>_</c> runs collapse.
+    /// This transform IS the wiring between a component and its drawing.
+    /// </summary>
+    public static string? ResourceKey(string componentName)
+    {
+        if (string.IsNullOrWhiteSpace(componentName)) return null;
+
+        var sb = new StringBuilder(componentName.Length);
+        foreach (var ch in componentName.Trim())
+        {
+            if (ch == '+') sb.Append("Plus");
+            else if (char.IsLetterOrDigit(ch)) sb.Append(ch);
+            else if (ch == '_' || char.IsWhiteSpace(ch) || ch == '/' || ch == '-') sb.Append('_');
+        }
+
+        var collapsed = new StringBuilder(sb.Length);
+        var lastWasSep = false;
+        foreach (var ch in sb.ToString())
+        {
+            if (ch == '_')
+            {
+                if (collapsed.Length > 0 && !lastWasSep) collapsed.Append('_');
+                lastWasSep = true;
+            }
+            else
+            {
+                collapsed.Append(ch);
+                lastWasSep = false;
+            }
+        }
+
+        var key = collapsed.ToString().TrimEnd('_');
+        return key.Length == 0 ? null : key;
+    }
+
+    /// <summary>Every glyph embedded in this assembly. For tests and tooling.</summary>
+    public static string[] AvailableNames()
+    {
+        var asm = typeof(Icons).Assembly;
+        var result = new List<string>();
+        foreach (var n in asm.GetManifestResourceNames())
+            if (n.StartsWith(ResourcePrefix, StringComparison.Ordinal) && n.EndsWith(".png", StringComparison.Ordinal))
+                result.Add(n.Substring(ResourcePrefix.Length, n.Length - ResourcePrefix.Length - 4));
+        result.Sort(StringComparer.Ordinal);
+        return result.ToArray();
     }
 }

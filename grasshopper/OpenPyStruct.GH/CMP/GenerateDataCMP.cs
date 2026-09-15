@@ -21,7 +21,7 @@ public class GenerateDataCMP : RunComponentBase
     }
 
     public override Guid ComponentGuid => new("28867662-A2C1-4554-8F81-A6A96002FB67");
-    protected override Bitmap Icon => Icons.For("Gen", Icons.RunColor);
+    protected override Bitmap Icon => Icons.For(Name);
     protected override string Task => "generate_data";
     protected override string ProgressLabel => "Generating";
 

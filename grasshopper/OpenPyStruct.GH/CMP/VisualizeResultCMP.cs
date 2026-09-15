@@ -28,7 +28,7 @@ public class VisualizeResultCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("6CA075B5-5B3A-414D-9F7D-C05DE6DFC847");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("Vz", Icons.ResultsColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {

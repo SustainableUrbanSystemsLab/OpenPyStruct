@@ -22,7 +22,7 @@ public class DeconstructResultCMP : GH_BeautifulComponent
 
     public override Guid ComponentGuid => new("8885DA1A-EE71-4E72-B3A9-42ED60777935");
     public override GH_Exposure Exposure => GH_Exposure.primary;
-    protected override Bitmap Icon => Icons.For("De", Icons.ResultsColor);
+    protected override Bitmap Icon => Icons.For(Name);
 
     protected override void RegisterInputParams(GH_InputParamManager pm)
     {
