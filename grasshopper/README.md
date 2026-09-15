@@ -1,0 +1,180 @@
+# OpenPyStruct for Grasshopper
+
+A Rhino 8 / Grasshopper plugin around the OpenPyStruct optimizers and surrogates. Model the
+structure in Rhino, press Run, and the OpenSees + PyTorch engine runs in a container; results come
+back as sections sized by their moment of inertia, force diagrams and deflected shapes.
+
+The plugin is laid out like an [Eddy3D](https://github.com/Eddy3D-Dev/Eddy3D) plugin: a ribbon of
+small components — **Model → Loads → Settings → Run → Results** — that pass one object down the
+wire, background runs that never block the canvas, inline run toggles, and a Rhino-free core
+library with the unit tests. It owns none of the physics: every number comes from the
+`openpystruct` Python package at the repository root, which factors the research scripts into
+importable, tested modules.
+
+```
+Rhino/Grasshopper (C#, .gha)          container (Podman or Docker)
+┌──────────────────────────┐  case.json   ┌─────────────────────────────┐
+│ Beam Model / Frame Model │ ───────────▶ │ openpystruct run            │
+│ Load Case                │              │   fe.py      OpenSeesPy or  │
+│ Optimize / Predict /     │ ◀─────────── │             numpy solver    │
+│ Generate Data / Train    │ result.json  │   optimize.py  Adam on I    │
+│ Visualize / Deconstruct  │              │   ml/        FNN, PINN      │
+└──────────────────────────┘              └─────────────────────────────┘
+```
+
+## Install
+
+1. **A container engine.** [Podman Desktop](https://podman-desktop.io/downloads) (free, rootless)
+   or Docker Desktop. Start it once.
+2. **The engine image.** From a checkout of this repository:
+   ```bash
+   docker/build.sh            # podman or docker, whichever is installed
+   ```
+   or in Grasshopper: drop an **Engine** component, wire the checkout path into *Repo*, press
+   *Build*. For GPU training build `docker/Dockerfile.cuda` as `openpystruct:cuda`.
+3. **The plugin.** Either install the YAK package from Rhino's Package Manager (once published) or
+   build from source:
+   ```bash
+   dotnet build grasshopper/OpenPyStruct.sln
+   ```
+   The build writes an `OpenPyStruct.ghlink` into your Grasshopper Libraries folder, so the next
+   Rhino start loads the dev build. Delete the `.ghlink` to go back to a packaged install.
+
+Apple Silicon: OpenSeesPy publishes Linux wheels for x86_64 only. The native arm64 image falls
+back to the package's numpy direct-stiffness solver (same element, same answers to round-off);
+set *Platform* to `linux/amd64` on the Engine component to run the emulated OpenSeesPy build.
+
+## Workflows
+
+### Optimize a beam
+
+`Beam Model` (a line, 100 elements, roller points) → `Load Case` (points + force vectors, a UDL)
+→ `Optimize` (Run) → `Visualize Result`. Add `Material` and `Optimizer Settings` to change the
+defaults; they are the beam script's when unwired. Wire several load cases into Optimize to
+design for all of them at once.
+
+### Optimize a frame
+
+`Frame Model` (member lines; supports default to fixing the lowest level) → `Load Case` (lateral
+forces at nodes, a UDL that lands on the horizontal members) → `Optimize` → `Visualize Result`.
+Any planar topology works: the frame script's bays × stories grid is one case of it.
+
+### Train and use a surrogate
+
+`Generate Data` (a few hundred samples first; the paper's sets are 10⁴–10⁵) → `Train Surrogate`
+(fnn or pinn) → `Predict` on a `Beam Model` with the same element count and up to *Cases* load
+cases. Predict runs the FE analysis on the predicted I so the result is checkable, not a bare
+curve. All three take hours at paper scale — the banner shows progress, *Cancel run* is on the
+right-click menu, and every run folder keeps `case.json`, `result.json` and its outputs.
+
+## Components
+
+Every component appends the plugin version to its description and has *Open Documentation…* on
+its menu, which lands on the matching heading below.
+
+### Beam Model
+A straight beam from a curve, split into N equal elements. Pin / Roller / Fixed points snap to
+the nearest node; nothing wired means simply supported. Draw beams horizontally: gravity is
+world −Z, the engine's y is up, and the beam runs along the curve's length. This is the only
+model the ML components accept.
+
+### Frame Model
+A planar frame from lines or polylines. Endpoints within *Tolerance* merge into nodes, members are
+classified column / beam / brace by angle, and the vertical analysis plane is fitted through the
+geometry (or given as *Plane*). Out-of-plane geometry is projected with a warning.
+
+### Load Case
+Point loads as force vectors (N) at points, snapped to nodes; a uniform load (N/m, negative down)
+on the chosen members — all elements of a beam or all horizontal members of a frame by default.
+The in-plane part of a vector is used; an out-of-plane component raises a warning.
+
+### Material
+E, ν, A, I₀ (starting I) and k (the shear-area proxy A = k√I). Defaults are the scripts' steel.
+
+### Optimizer Settings
+Epochs, learning rate, decay, the two energy weights α_M and α_V, the early-stopping tolerance and
+patience, and the I floor. Shared by Optimize and Generate Data.
+
+### Engine
+Image name, CLI path, CPU limit, GPU, platform, FE backend, runs folder, timeout. *Check* probes
+the CLI, daemon and image; *Build* builds the image from a repository checkout. Unwired Run
+components use the defaults (image `openpystruct`, Podman then Docker, `~/OpenPyStruct/runs`).
+
+### Optimize
+Runs the moment-of-inertia optimizer for the wired load cases. Outputs the run as ONE Result item,
+the engine log, the run folder, I per element and a summary. The gradient is the scripts' frozen-
+force gradient: the section forces are constants within an epoch and only I carries a gradient.
+
+### Predict
+Surrogate inference from a trained model bundle (`model.pt`), then an FE check. The beam must
+have the model's element count; fewer load cases than the model's cases-per-sample are repeated.
+
+### Generate Data
+Random point-load cases on a beam, each optimized, into `dataset.json` in the run folder
+(the `StructDataLite.json` layout plus the multicore script's extra fields).
+
+### Train Surrogate
+FNN (residual MLP predicting I) or PINN (also deflections and rotations, with a physics loss)
+on a dataset. Writes `model.pt`: architecture, feature scalers and weights in one file.
+
+### Deconstruct Result
+I per element; axial, shear and moment at both element ends; displacement vectors and rotations
+per node; the loss history. Sign convention: sagging-positive moment, V = dM/dx, tension positive.
+
+### Visualize Result
+A box per element with depth (12·I/b)^(1/3) for the chosen width b, coloured by I over a range
+you can pin; moment and shear diagrams as offset polygons per element; the deflected shape.
+Scales of 0 fit the diagrams to a tenth of the model.
+
+## The contract
+
+`case.json` in, `result.json` out, both versioned (`openpystruct.case/1`, `openpystruct.result/1`).
+The C# mirror is `OpenPyStruct.Core/Contract`; the Python definition and defaults are
+`openpystruct/schema.py`. Units are SI; the 2D model's y axis is up, so gravity loads are
+negative. Progress is streamed as `PROGRESS done total value` lines on stdout.
+
+One deliberate deviation from the scripts: they pass `eleLoad -beamUniform udl udl`, which also
+applies the UDL as an AXIAL distributed load. The engine applies only the transverse component
+of a vertical load (on a frame the original pushes every floor sideways).
+
+## Troubleshooting
+
+- **Run or Build hangs with no output.** Podman's file sharing into its VM can go stale for one
+  share: a `-v /Users/...` mount blocks forever while `/private/tmp` works. `podman machine stop`
+  then `podman machine start` fixes it. (Base images are `docker.io/`-qualified for the same
+  family of problem: Podman's short-name prompt hangs without a terminal.)
+- **"No container engine found."** Rhino launched from the Dock does not see your shell PATH;
+  the plugin probes `/opt/podman/bin`, Homebrew and Docker Desktop's folders, and honours
+  `OPENPYSTRUCT_CONTAINER_CLI` or the Engine component's *CLI* input.
+- **"image 'openpystruct' not found."** Build it (step 2 above) — the plugin never pulls.
+- **Predict: "this model predicts N elements".** Rebuild the beam with N elements; the surrogate
+  is tied to the element count it was trained on.
+
+## Development
+
+```bash
+python -m pip install -e ".[test]" && python -m pytest        # 22 tests, both FE backends
+dotnet test grasshopper/OpenPyStruct.Core.Tests                # 26 tests, Rhino-free
+dotnet test grasshopper/OpenPyStruct.Core.Tests --filter FullyQualifiedName~ContainerSmoke   # [Explicit], needs the image
+```
+
+Layout:
+
+```
+openpystruct/            Python package: fe, optimize, beam, datagen, ml/{features,models,train,predict}, cli
+docker/                  Dockerfile (CPU), Dockerfile.cuda, build.sh
+grasshopper/
+  OpenPyStruct.Core/     Rhino-free: JSON contract, beam/frame builders, container runner, result helpers
+  OpenPyStruct.Core.Tests/
+  OpenPyStruct.GH/       the .gha: CMP/ components, Types/ wire objects, GUI/ (banner UI copied from Eddy3D)
+  manifest.yml           YAK package manifest
+```
+
+`GUI/` is copied from Eddy3D so the components get its inline toggles, dropdowns, progress banner
+and background-run pattern without an assembly dependency; see `GUI/README.md` for provenance.
+
+## License
+
+The Grasshopper plugin (`OpenPyStruct.GH`, the `.gha`) is **GPL-3.0-or-later** because it links
+Eddy3D's GPL component chrome (`OpenPyStruct.GH/GUI/`) — see `LICENSE` in this folder. The Python
+engine, the Docker files and `OpenPyStruct.Core` are MIT like the rest of the repository.

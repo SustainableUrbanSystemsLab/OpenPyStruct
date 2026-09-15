@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Grasshopper plugin (Rhino 8, net8.0). Post-build writes a .ghlink into the user's
+    Grasshopper Libraries folder so a `dotnet build` is enough to load the dev build — the same
+    trick Eddy3D uses. Remove the .ghlink to go back to a YAK-installed copy.
+  -->
+  <PropertyGroup>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <TargetExt>.gha</TargetExt>
+    <NoWarn>NU1701;NETSDK1086;CA1416;SYSLIB0014;CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8625</NoWarn>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>OpenPyStruct.GH</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>annotations</Nullable>
+    <AssemblyName>OpenPyStruct</AssemblyName>
+    <Title>OpenPyStruct</Title>
+    <Description>OpenSees + PyTorch structural optimization and ML surrogates for Grasshopper</Description>
+    <Copyright>Copyright (c) OpenPyStruct Authors and Eddy3D Authors. Licensed under GPL-3.0-or-later.</Copyright>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grasshopper" Version="8.27.26019.16021" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <!-- WinForms is what Grasshopper's canvas API is written against. -->
+  <PropertyGroup Condition="$(TargetFramework.Contains('-windows')) or $(TargetFramework.StartsWith('net4'))">
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+  <ItemGroup Condition="!($(TargetFramework.Contains('-windows')) or $(TargetFramework.StartsWith('net4')))">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net48" Version="1.0.3" ExcludeAssets="all" GeneratePathProperty="true" />
+    <Reference Include="$(PkgMicrosoft_NETFramework_ReferenceAssemblies_net48)\build\.NETFramework\v4.8\System.Windows.Forms.dll" Private="False" />
+    <PackageReference Include="System.Drawing.Common" Version="7.0.0" ExcludeAssets="runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenPyStruct.Core\OpenPyStruct.Core.csproj" />
+  </ItemGroup>
+
+  <Target Name="WriteGrasshopperGhLink" AfterTargets="AfterBuild">
+    <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
+      <GhLinkDir>$(APPDATA)\Grasshopper\Libraries</GhLinkDir>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(OS)' != 'Windows_NT'">
+      <GhLinkDir>$(HOME)/Library/Application Support/McNeel/Rhinoceros/8.0/Plug-ins/Grasshopper (b45a29b1-4343-4035-989e-044e8580d9cf)/Libraries</GhLinkDir>
+    </PropertyGroup>
+    <PropertyGroup>
+      <GhLinkFile>$(GhLinkDir)/OpenPyStruct.ghlink</GhLinkFile>
+    </PropertyGroup>
+    <MakeDir Directories="$(GhLinkDir)" />
+    <WriteLinesToFile File="$(GhLinkFile)" Lines="$(TargetDir)" Overwrite="true" />
+  </Target>
+
+</Project>

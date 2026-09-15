@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Rhino-free core of the OpenPyStruct Grasshopper plugin: the JSON contract with the Python
+    engine, the beam/frame builders (pure geometry, no RhinoCommon), the container runner and
+    the result post-processing. Everything here is unit-tested cross-platform.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>OpenPyStruct.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenPyStruct.Core.Tests" />
+  </ItemGroup>
+
+</Project>

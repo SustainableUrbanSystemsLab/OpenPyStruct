@@ -1,0 +1,16 @@
+name: OpenPyStruct
+version: 0.1.0
+authors:
+  - OpenPyStruct Authors
+description: >
+  Structural optimization for Grasshopper with OpenSees + PyTorch: gradient-based
+  moment-of-inertia design of beams and frames, training-data generation, and
+  FNN/PINN surrogates. The engine runs in a container (Podman or Docker).
+url: https://github.com/SustainableUrbanSystemsLab/OpenPyStruct
+keywords:
+  - structural
+  - optimization
+  - opensees
+  - pytorch
+  - machine-learning
+  - "guid:5c1f0b1e-7a3b-4c7b-9c6e-0f1e2d3c4b5a"  # OpenPyStructInfo.Id
