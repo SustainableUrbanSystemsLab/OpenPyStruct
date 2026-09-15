@@ -44,6 +44,16 @@ Apple Silicon: OpenSeesPy publishes Linux wheels for x86_64 only. The native arm
 back to the package's numpy direct-stiffness solver (same element, same answers to round-off);
 set *Platform* to `linux/amd64` on the Engine component to run the emulated OpenSeesPy build.
 
+### Native mode (Apple GPU)
+
+The container is the reproducible default, but it can never reach a Mac's GPU. The Engine
+component's *Mode* = `native` runs the same `openpystruct` package with a Python on your machine
+instead. Point *Repo* at the checkout and press *Build* once: it creates `~/OpenPyStruct/venv`, installs
+torch (the MPS build on macOS) and the package, and *Check* then reports what the engine would pick,
+e.g. `"device": "mps"`. Set *Device* to `mps` (or leave `auto`, which prefers CUDA, then MPS, then
+CPU). Everything else — case files, run folders, results — is identical in both modes. Wire your own
+interpreter into *Python* to skip the venv.
+
 ## Workflows
 
 ### Optimize a beam
@@ -168,9 +178,9 @@ of a vertical load (on a frame the original pushes every floor sideways).
 - **"image 'openpystruct' not found."** Build it (step 2 above) — the plugin never pulls.
 - **Training runs on the CPU although GPU is on.** A container reaches a GPU only through CUDA on
   an NVIDIA host. On macOS it runs inside a Linux VM with no Metal passthrough, so the switch does
-  nothing and `openpystruct info` in the image reports `mps: false`. To use an Apple GPU, run the
-  engine natively (`pip install -e .` then `openpystruct run case.json result.json`), where the
-  device order is CUDA, then MPS, then CPU. Train Surrogate reports the device it used.
+  nothing and `openpystruct info` in the image reports `mps: false`. For an Apple GPU set the
+  Engine's *Mode* to `native` and *Device* to `mps` (see below). Train Surrogate reports the device
+  it used.
 - **Predict: "this model predicts N elements".** Rebuild the beam with N elements; the surrogate
   is tied to the element count it was trained on.
 

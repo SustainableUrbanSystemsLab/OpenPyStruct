@@ -51,6 +51,47 @@ public class TestEngine
     }
 
     [Test]
+    public void NativeModeUsesHostPathsAndTheInterpreter()
+    {
+        var s = new EngineSettings { Mode = EngineMode.Native, Device = "mps" };
+        var run = Path.Combine(Path.GetTempPath(), "ops-native");
+        Assert.That(EngineRunner.ExposeFile(s, run, Path.Combine("models", "a.pt")),
+            Is.EqualTo(Path.GetFullPath(Path.Combine("models", "a.pt"))));
+        Assert.That(s.ExtraMounts, Is.Empty);
+        var args = NativeRunner.RunArgs(run);
+        Assert.That(args, Is.EqualTo(new[] { "-m", "openpystruct.cli", "run",
+            Path.Combine(run, "case.json"), Path.Combine(run, "result.json") }));
+        Assert.That(EngineRunner.ToHostPath(s, run, "/some/host/dataset.json"), Is.EqualTo("/some/host/dataset.json"));
+        var c = new EngineSettings();
+        Assert.That(EngineRunner.ToHostPath(c, run, "/work/dataset.json"), Is.EqualTo(Path.Combine(run, "dataset.json")));
+    }
+
+    [Test]
+    public void PrepareRunFolderStampsTheDevice()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "ops-tests", Guid.NewGuid().ToString("N"));
+        var s = new EngineSettings { RunsRoot = root, Mode = EngineMode.Native, Device = "mps" };
+        var folder = EngineRunner.PrepareRunFolder(s, new CaseDocument { Task = "train" });
+        var written = CaseDocument.FromJson(File.ReadAllText(Path.Combine(folder, "case.json")));
+        Assert.That(written.Device, Is.EqualTo("mps"));
+        var auto = EngineRunner.PrepareRunFolder(new EngineSettings { RunsRoot = root }, new CaseDocument());
+        Assert.That(CaseDocument.FromJson(File.ReadAllText(Path.Combine(auto, "case.json"))).Device, Is.Null);
+        Directory.Delete(root, true);
+    }
+
+    [Test]
+    public void NativeInstallStepsBuildAVenvThenTorchThenThePackage()
+    {
+        var steps = NativeRunner.InstallSteps("/usr/bin/python3", "/tmp/venv", "/repo");
+        Assert.That(steps.Count, Is.EqualTo(4));
+        Assert.That(steps[0].Exe, Is.EqualTo("/usr/bin/python3"));
+        Assert.That(steps[0].Args, Does.Contain("venv").And.Contain("/tmp/venv"));
+        Assert.That(steps[2].Args, Does.Contain("torch"));
+        Assert.That(steps[3].Args, Does.Contain("-e").And.Contain("/repo"));
+        Assert.That(NativeRunner.ResolvePython(new EngineSettings { Python = "/nope/python" }), Is.Null);
+    }
+
+    [Test]
     public void BuildArgs()
     {
         var s = new EngineSettings { Image = "openpystruct" };

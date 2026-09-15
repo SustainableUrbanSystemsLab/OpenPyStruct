@@ -102,11 +102,8 @@ public class GenerateDataCMP : RunComponentBase
 
     protected override void SetOutputs(IGH_DataAccess da, RunResult r)
     {
-        var path = r.Result.DatasetPath;
-        // The engine wrote a container path (/work/dataset.json); hand back the host path.
-        if (path != null && path.StartsWith(Core.Engine.ContainerRunner.ContainerWorkDir))
-            path = System.IO.Path.Combine(r.Folder, path.Substring(Core.Engine.ContainerRunner.ContainerWorkDir.Length).TrimStart('/'));
-        da.SetData("Dataset", path);
+        // A container wrote /work/dataset.json; natively the path is already the host's.
+        da.SetData("Dataset", Core.Engine.EngineRunner.ToHostPath(r.Engine, r.Folder, r.Result.DatasetPath));
         da.SetData("Count", r.Result.Samples ?? 0);
     }
 }

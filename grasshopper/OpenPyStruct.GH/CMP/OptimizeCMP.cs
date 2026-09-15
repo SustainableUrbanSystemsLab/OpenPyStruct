@@ -150,7 +150,7 @@ public class PredictCMP : RunComponentBase
 
     protected override void Prepare(Core.Engine.EngineSettings settings, string runFolder, CaseDocument doc)
     {
-        doc.TaskParams["model"] = Core.Engine.ContainerRunner.ExposeFile(settings, runFolder, _modelFile);
+        doc.TaskParams["model"] = Core.Engine.EngineRunner.ExposeFile(settings, runFolder, _modelFile);
     }
 
     protected override void SetOutputs(IGH_DataAccess da, RunResult r)

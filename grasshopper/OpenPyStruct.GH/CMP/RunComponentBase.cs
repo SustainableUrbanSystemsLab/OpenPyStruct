@@ -145,7 +145,7 @@ public abstract class RunComponentBase : GH_BeautifulComponent
 
         Background.Start(ct =>
         {
-            var runFolder = ContainerRunner.PrepareRunFolder(settings, doc, folder, Task);
+            var runFolder = EngineRunner.PrepareRunFolder(settings, doc, folder, Task);
             _folder = runFolder;
             Prepare(settings, runFolder, doc);
             // Prepare may have changed task_params (container-side paths): write the final case.
@@ -153,7 +153,7 @@ public abstract class RunComponentBase : GH_BeautifulComponent
             log("run folder: " + runFolder);
             Background.SetBanner(ProgressLabel + "…");
 
-            var (outcome, result) = ContainerRunner.RunCase(settings, runFolder, log,
+            var (outcome, result) = EngineRunner.RunCase(settings, runFolder, log,
                 p => Background.SetProgress(ProgressLabel, p.Fraction), ct);
             elapsed = outcome.Elapsed;
             ct.ThrowIfCancellationRequested();
@@ -169,7 +169,7 @@ public abstract class RunComponentBase : GH_BeautifulComponent
                 if (result.Traceback != null) log(result.Traceback);
                 throw new InvalidOperationException(result.Error ?? "the engine reported a failure without a message");
             }
-            produced = new RunResult { Task = Task, Case = doc, Result = result, Folder = runFolder, Elapsed = elapsed, Model = model };
+            produced = new RunResult { Task = Task, Case = doc, Result = result, Folder = runFolder, Elapsed = elapsed, Model = model, Engine = settings };
         }, (canceled, error) =>
         {
             _canceled = canceled;

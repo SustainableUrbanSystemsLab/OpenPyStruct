@@ -20,6 +20,8 @@ public class EngineCMP : GH_BeautifulComponent
 {
     private static readonly string[] Platforms = { "native", "linux/amd64", "linux/arm64" };
     private static readonly string[] Backends = { "auto", "opensees", "numpy" };
+    private static readonly string[] Modes = { "container", "native" };
+    private static readonly string[] Devices = { "auto", "mps", "cuda", "cpu" };
 
     private readonly BackgroundRun _bg;
     private string _status;
@@ -63,12 +65,25 @@ public class EngineCMP : GH_BeautifulComponent
             + "(under your home on purpose — that is what Podman/Docker share with the VM by default).", GH_ParamAccess.item);
         pm[6].Optional = true;
         pm.AddIntegerParameter("Timeout", "Timeout", "Kill a run after this many minutes; 0 = never.", GH_ParamAccess.item, 0);
-        pm.AddTextParameter("Repo", "Repo", "Path to an OpenPyStruct checkout (contains docker/Dockerfile), for Build.", GH_ParamAccess.item);
+        pm.AddTextParameter("Repo", "Repo", "Path to an OpenPyStruct checkout, for Build (docker/Dockerfile in container mode, the package itself in native mode).", GH_ParamAccess.item);
         pm[8].Optional = true;
-        pm.AddParameter(new GH_ToggleParam("Check", "Check", "Probe the CLI, the daemon and the image.", this));
+        pm.AddParameter(new GH_DropdownParam(Modes, "Mode", "Mode",
+            "container: the openpystruct image under Podman/Docker — reproducible, CUDA only.\n"
+            + "native: a Python on this machine. The ONLY way to a GPU on a Mac: Apple's MPS is reachable "
+            + "from the host and never from a container. Build creates the venv; Check reports the device.",
+            this, defaultItem: Modes[0]));
         pm[9].Optional = true;
-        pm.AddParameter(new GH_ToggleParam("Build", "Build", "Build the image from Repo (minutes; pulls torch).", this));
+        pm.AddTextParameter("Python", "Python", "Native mode: interpreter to run. Unwired: the venv Build created "
+            + "(~/OpenPyStruct/venv), else python3 on PATH.", GH_ParamAccess.item);
         pm[10].Optional = true;
+        pm.AddParameter(new GH_DropdownParam(Devices, "Device", "Device",
+            "What Train runs on. auto = CUDA, then MPS, then CPU. Only native mode can reach MPS.",
+            this, defaultItem: Devices[0]));
+        pm[11].Optional = true;
+        pm.AddParameter(new GH_ToggleParam("Check", "Check", "Probe the engine: CLI, daemon and image, or the Python and its device.", this));
+        pm[12].Optional = true;
+        pm.AddParameter(new GH_ToggleParam("Build", "Build", "Container: build the image from Repo. Native: create a venv with torch and the package from Repo. Minutes either way.", this));
+        pm[13].Optional = true;
     }
 
     protected override void RegisterOutputParams(GH_OutputParamManager pm)
@@ -97,9 +112,7 @@ public class EngineCMP : GH_BeautifulComponent
         text = null; if (da.GetData(1, ref text) && !string.IsNullOrWhiteSpace(text)) s.Cli = text.Trim();
         if (da.GetData(2, ref d)) s.Cpus = Math.Max(0, d);
         da.GetData(3, ref gpu); s.Gpu = gpu;
-        if (gpu && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            Warning("GPU has no effect on macOS: a container runs in a Linux VM with no Metal "
-                    + "passthrough, so training runs on the CPU. Run the engine natively to use MPS.");
+        var gpuOnMac = gpu && RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
         var platform = Selected(4) ?? Platforms[0];
         s.Platform = platform == "native" ? null : platform;
         var backend = Selected(5) ?? Backends[0];
@@ -107,7 +120,15 @@ public class EngineCMP : GH_BeautifulComponent
         text = null; if (da.GetData(6, ref text) && !string.IsNullOrWhiteSpace(text)) s.RunsRoot = text.Trim();
         if (da.GetData(7, ref i)) s.TimeoutMinutes = Math.Max(0, i);
         string repo = null; da.GetData(8, ref repo);
-        da.GetData(9, ref check); da.GetData(10, ref build);
+        s.Mode = (Selected(9) ?? Modes[0]) == "native" ? EngineMode.Native : EngineMode.Container;
+        text = null; if (da.GetData(10, ref text) && !string.IsNullOrWhiteSpace(text)) s.Python = text.Trim();
+        s.Device = Selected(11) ?? Devices[0];
+        da.GetData(12, ref check); da.GetData(13, ref build);
+        if (gpuOnMac && s.Mode == EngineMode.Container)
+            Warning("GPU has no effect on macOS in container mode: the VM has no Metal passthrough. "
+                    + "Switch Mode to native and Device to mps.");
+        if (s.Mode == EngineMode.Container && s.Device == "mps")
+            Warning("MPS is only reachable in native mode; the container will fall back to the CPU.");
 
         da.SetData(0, new EngineDef { Settings = s });
 
@@ -116,6 +137,39 @@ public class EngineCMP : GH_BeautifulComponent
             Message = _bg.Banner ?? "Working…";
             da.SetDataList(1, _bg.Lines);
             return;
+        }
+
+        if (build && s.Mode == EngineMode.Native)
+        {
+            ResetToggle("Build");
+            if (string.IsNullOrWhiteSpace(repo) || !File.Exists(Path.Combine(repo, "pyproject.toml")))
+            {
+                Error("Build needs Repo: a folder containing pyproject.toml (an OpenPyStruct checkout).");
+            }
+            else
+            {
+                Launch("Installing", ct =>
+                {
+                    var bootstrap = NativeRunner.ResolvePython(new EngineSettings { RunsRoot = s.RunsRoot })
+                                    ?? throw new InvalidOperationException("No python3 on this machine to create the venv with. Install Python 3.10+ first.");
+                    var venv = NativeRunner.VenvDir(s);
+                    var log = _bg.NewLog();
+                    var steps = NativeRunner.InstallSteps(bootstrap, venv, repo);
+                    for (var k = 0; k < steps.Count; k++)
+                    {
+                        var (exe, args) = steps[k];
+                        _bg.SetBanner($"Installing… {k + 1}/{steps.Count}");
+                        log("$ " + ContainerRunner.Render(exe, args));
+                        var outcome = ContainerRunner.Execute(exe, args, log, null, ct, 0, repo);
+                        if (!outcome.Succeeded) throw new InvalidOperationException($"step {k + 1} failed (exit {outcome.ExitCode}); see Status");
+                    }
+                    var problem = NativeRunner.Readiness(s, out _, out var info);
+                    if (problem != null) throw new InvalidOperationException(problem);
+                    return $"Installed venv at {venv}: {info}";
+                });
+                Message = "Installing…";
+                return;
+            }
         }
 
         if (build)
@@ -156,6 +210,14 @@ public class EngineCMP : GH_BeautifulComponent
             Launch("Checking", _ =>
             {
                 var log = _bg.NewLog();
+                if (s.Mode == EngineMode.Native)
+                {
+                    var nativeProblem = NativeRunner.Readiness(s, out var python, out var info);
+                    log("python: " + (python ?? "(none)"));
+                    if (info != null) log(info);
+                    if (nativeProblem != null) throw new InvalidOperationException(nativeProblem);
+                    return $"Ready: {python} — {info}";
+                }
                 var problem = ContainerRunner.Readiness(s, out var cli);
                 log("cli: " + (cli ?? "(none)"));
                 if (problem != null) throw new InvalidOperationException(problem);
@@ -171,7 +233,7 @@ public class EngineCMP : GH_BeautifulComponent
             if (_status.StartsWith("Error", StringComparison.Ordinal)) Warning(_status);
         }
         else
-            Message = s.Image;
+            Message = s.Mode == EngineMode.Native ? "native" : s.Image;
         da.SetDataList(1, _bg.Lines.Count == 0 && _status != null ? new[] { _status } : _bg.Lines);
     }
 

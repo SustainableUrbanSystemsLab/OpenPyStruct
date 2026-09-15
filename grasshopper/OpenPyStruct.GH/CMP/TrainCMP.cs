@@ -94,7 +94,7 @@ public class TrainCMP : RunComponentBase
 
     protected override void Prepare(EngineSettings settings, string runFolder, CaseDocument doc)
     {
-        doc.TaskParams["dataset"] = ContainerRunner.ExposeFile(settings, runFolder, _dataset);
+        doc.TaskParams["dataset"] = EngineRunner.ExposeFile(settings, runFolder, _dataset);
     }
 
     protected override void SetOutputs(IGH_DataAccess da, RunResult r)

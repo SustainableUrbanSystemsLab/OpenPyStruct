@@ -108,6 +108,7 @@ public sealed class RunResult
     public required string Folder { get; init; }
     public required TimeSpan Elapsed { get; init; }
     public ModelDef? Model { get; init; }
+    public EngineSettings Engine { get; init; } = new();
 
     public override string ToString()
     {

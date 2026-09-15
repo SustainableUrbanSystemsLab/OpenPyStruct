@@ -1,9 +1,26 @@
 namespace OpenPyStruct.Core.Engine;
 
 /// <summary>How and where the Python engine runs. One object, wired from the Engine component.</summary>
+public enum EngineMode
+{
+    /// <summary>The openpystruct image under Podman or Docker. Reproducible; CUDA only.</summary>
+    Container,
+    /// <summary>A Python interpreter on this machine with the package installed. The only way to a
+    /// GPU on macOS: MPS is reachable from the host and never from a container.</summary>
+    Native,
+}
+
 public sealed class EngineSettings
 {
     public const string DefaultImage = "openpystruct";
+
+    public EngineMode Mode { get; set; } = EngineMode.Container;
+
+    /// <summary>Native mode: the interpreter to run, or null for the auto-detected venv/python3.</summary>
+    public string? Python { get; set; }
+
+    /// <summary>"auto", "cuda", "mps" or "cpu": what training runs on. Forwarded as the case's device.</summary>
+    public string Device { get; set; } = "auto";
 
     /// <summary>Image name[:tag]. Local builds are found by bare name on both CLIs.</summary>
     public string Image { get; set; } = DefaultImage;
@@ -32,6 +49,7 @@ public sealed class EngineSettings
     public EngineSettings Clone() => new()
     {
         Image = Image, Cli = Cli, Cpus = Cpus, Gpu = Gpu, Platform = Platform,
+        Mode = Mode, Python = Python, Device = Device,
         ExtraArgs = new List<string>(ExtraArgs), ExtraMounts = new List<Mount>(ExtraMounts),
         FeBackend = FeBackend, TimeoutMinutes = TimeoutMinutes, RunsRoot = RunsRoot,
     };
@@ -61,7 +79,8 @@ public sealed class EngineSettings
         public string Spec => $"{HostDir}:{ContainerDir}" + (ReadOnly ? ":ro" : "");
     }
 
-    public override string ToString() =>
-        $"OpenPyStruct engine: image {Image}" + (Gpu ? ", GPU" : "") + (Cpus > 0 ? $", {Cpus} cpus" : "")
+    public override string ToString() => Mode == EngineMode.Native
+        ? $"OpenPyStruct engine: native python {Python ?? "(auto)"}, device {Device}"
+        : $"OpenPyStruct engine: image {Image}" + (Gpu ? ", GPU" : "") + (Cpus > 0 ? $", {Cpus} cpus" : "")
         + (Platform != null ? $", {Platform}" : "");
 }

@@ -20,6 +20,9 @@ public sealed class CaseDocument
     /// <summary>"opensees", "numpy" or null for the engine's own choice.</summary>
     [JsonPropertyName("fe_backend")] public string? FeBackend { get; set; }
 
+    /// <summary>"cuda", "mps", "cpu" or null for the engine's own choice (CUDA, then MPS, then CPU).</summary>
+    [JsonPropertyName("device")] public string? Device { get; set; }
+
     [JsonPropertyName("model")] public StructuralModel? Model { get; set; }
     [JsonPropertyName("material")] public Material Material { get; set; } = new();
     [JsonPropertyName("load_cases")] public List<LoadCase> LoadCases { get; set; } = new();
