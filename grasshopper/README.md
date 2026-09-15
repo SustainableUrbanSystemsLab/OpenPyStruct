@@ -147,6 +147,11 @@ of a vertical load (on a frame the original pushes every floor sideways).
   the plugin probes `/opt/podman/bin`, Homebrew and Docker Desktop's folders, and honours
   `OPENPYSTRUCT_CONTAINER_CLI` or the Engine component's *CLI* input.
 - **"image 'openpystruct' not found."** Build it (step 2 above) — the plugin never pulls.
+- **Training runs on the CPU although GPU is on.** A container reaches a GPU only through CUDA on
+  an NVIDIA host. On macOS it runs inside a Linux VM with no Metal passthrough, so the switch does
+  nothing and `openpystruct info` in the image reports `mps: false`. To use an Apple GPU, run the
+  engine natively (`pip install -e .` then `openpystruct run case.json result.json`), where the
+  device order is CUDA, then MPS, then CPU. Train Surrogate reports the device it used.
 - **Predict: "this model predicts N elements".** Rebuild the beam with N elements; the surrogate
   is tied to the element count it was trained on.
 

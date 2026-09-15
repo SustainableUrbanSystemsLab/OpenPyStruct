@@ -57,6 +57,18 @@ public class TestContract
     }
 
     [Test]
+    public void ResultCarriesTheTrainingDevice()
+    {
+        var r = ResultDocument.Parse("""
+            {"schema":"openpystruct.result/1","task":"train","ok":true,"device":"mps","nelem":100}
+            """);
+        Assert.That(r.Device, Is.EqualTo("mps"));
+        Assert.That(r.Nelem, Is.EqualTo(100));
+        var old = ResultDocument.Parse("""{"schema":"openpystruct.result/1","task":"train","ok":true}""");
+        Assert.That(old.Device, Is.Null);
+    }
+
+    [Test]
     public void ResultCarriesErrors()
     {
         var r = ResultDocument.Parse("""{"schema":"openpystruct.result/1","task":"train","ok":false,"error":"boom"}""");

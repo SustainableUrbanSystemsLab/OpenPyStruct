@@ -78,7 +78,9 @@ def main(argv=None) -> int:
         print(json.dumps({
             "version": __version__, "case_schema": CASE_SCHEMA, "result_schema": RESULT_SCHEMA,
             "opensees": opensees_available(),
-            "cuda": _cuda_available(),
+            "cuda": _accel("cuda"),
+            "mps": _accel("mps"),
+            "device": _default_device(),
         }))
         return 0
 
@@ -110,12 +112,25 @@ def main(argv=None) -> int:
     return code
 
 
-def _cuda_available() -> bool:
+def _accel(kind: str) -> bool:
+    """Whether CUDA / Apple MPS is reachable from where this engine is running."""
     try:
         import torch
-        return bool(torch.cuda.is_available())
+        if kind == "cuda":
+            return bool(torch.cuda.is_available())
+        mps = getattr(torch.backends, "mps", None)
+        return bool(mps is not None and mps.is_available())
     except Exception:
         return False
+
+
+def _default_device() -> str:
+    """What training would pick right now -- the one line that answers "is it on the GPU?"."""
+    try:
+        from .ml.train import resolve_device
+        return resolve_device(None).type
+    except Exception:
+        return "cpu"
 
 
 if __name__ == "__main__":

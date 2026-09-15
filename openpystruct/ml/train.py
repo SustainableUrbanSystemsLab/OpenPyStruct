@@ -61,6 +61,26 @@ DEFAULTS = {
 }
 
 
+def resolve_device(requested: Optional[str] = None) -> "torch.device":
+    """The device training runs on: an explicit request, else the best available.
+
+    Order is CUDA, then Apple's MPS (Metal), then CPU. MPS matters because a Mac has no CUDA and
+    the old check asked for CUDA alone, so training there fell to the CPU silently.
+
+    A GPU is only reachable when the engine runs on the HOST. A container on macOS runs inside a
+    Linux VM with no Metal passthrough, so `openpystruct info` inside the image reports mps false
+    however the container was started -- the Engine component's GPU switch only means CUDA.
+    """
+    if requested and requested not in ("auto", ""):
+        return torch.device(requested)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    mps = getattr(torch.backends, "mps", None)
+    if mps is not None and mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 def train(params: dict, case_dir: str, progress: Optional[Callable[[int, int, float], None]] = None,
           device: Optional[str] = None) -> dict:
     p = dict(DEFAULTS)
@@ -70,7 +90,10 @@ def train(params: dict, case_dir: str, progress: Optional[Callable[[int, int, fl
         raise ValueError(f"kind must be 'fnn' or 'pinn', got {kind!r}")
     torch.manual_seed(int(p["seed"]))
     np.random.seed(int(p["seed"]))
-    dev = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+    dev = resolve_device(device)
+    # Printed, not inferred: training that quietly fell back to the CPU used to look identical to
+    # training on a GPU until you timed it.
+    print(f"device: {dev.type}", flush=True)
 
     dataset_path = p["dataset"] if os.path.isabs(p["dataset"]) else os.path.join(case_dir, p["dataset"])
     with open(dataset_path, "r", encoding="utf-8") as f:
@@ -187,6 +210,7 @@ def train(params: dict, case_dir: str, progress: Optional[Callable[[int, int, fl
         "samples": int(n),
         "nelem": int(nelem),
         "n_cases": int(p["n_cases"]),
+        "device": dev.type,
         "train_loss": hist_tr,
         "val_loss": hist_va,
     }

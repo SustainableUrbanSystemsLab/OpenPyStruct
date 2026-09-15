@@ -105,6 +105,11 @@ public class TrainCMP : RunComponentBase
         da.SetData("Summary",
             $"{(res.ModelKind ?? "fnn").ToUpperInvariant()} surrogate for {res.Nelem} elements, {res.NCases} cases per sample\n"
             + $"Samples: {res.Samples}, epochs: {res.Epochs}, best validation loss: {res.BestValLoss:0.####}\n"
+            + $"Device: {res.Device ?? "unknown"}\n"
             + $"{r.Elapsed.TotalSeconds:0.#} s, weights: {System.IO.Path.Combine(r.Folder, "model.pt")}");
+        if (res.Device == "cpu")
+            AddRuntimeMessage(GH_RuntimeMessageLevel.Remark,
+                "Trained on the CPU. A container reaches a GPU only through CUDA on an NVIDIA host; "
+                + "on macOS it cannot reach Metal at all, so the Engine's GPU switch does nothing there.");
     }
 }

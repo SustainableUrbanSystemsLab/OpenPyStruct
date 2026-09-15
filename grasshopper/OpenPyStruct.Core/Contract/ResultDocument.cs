@@ -86,6 +86,8 @@ public sealed class ResultDocument
     public int? Samples => _root["samples"]?.GetValue<int>();
     public int? Nelem => _root["nelem"]?.GetValue<int>();
     public int? NCases => _root["n_cases"]?.GetValue<int>();
+    /// <summary>The device training actually ran on: "cuda", "mps" or "cpu".</summary>
+    public string? Device => _root["device"]?.GetValue<string>();
     public double? BestValLoss => _root["best_val_loss"] is JsonValue v && v.TryGetValue<double>(out var d) ? d : null;
     public double[]? TrainLoss => Doubles(_root["train_loss"]);
     public double[]? ValLoss => Doubles(_root["val_loss"]);

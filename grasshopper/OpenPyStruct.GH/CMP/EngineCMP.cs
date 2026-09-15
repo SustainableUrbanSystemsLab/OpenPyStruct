@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Grasshopper.Kernel;
 using OpenPyStruct.Core.Engine;
@@ -45,7 +46,10 @@ public class EngineCMP : GH_BeautifulComponent
         pm.AddTextParameter("CLI", "CLI", "Full path to podman or docker. Unwired: auto-detect (env OPENPYSTRUCT_CONTAINER_CLI overrides).", GH_ParamAccess.item);
         pm[1].Optional = true;
         pm.AddNumberParameter("CPUs", "CPUs", "CPU limit for the container; 0 = no limit.", GH_ParamAccess.item, 0.0);
-        pm.AddParameter(new GH_ToggleParam("GPU", "GPU", "Expose NVIDIA GPUs (training only benefits). Needs the CUDA image.", this));
+        pm.AddParameter(new GH_ToggleParam("GPU", "GPU",
+            "Expose NVIDIA GPUs to the container (only Train benefits). Needs the CUDA image and an "
+            + "NVIDIA host. It does NOTHING on macOS: a container there runs in a Linux VM that cannot "
+            + "reach Metal, so training falls back to the CPU whatever this says.", this));
         pm[3].Optional = true;
         pm.AddParameter(new GH_DropdownParam(Platforms, "Platform", "Platform",
             "Container platform. On Apple Silicon choose linux/amd64 to get OpenSeesPy (emulated, slower); "
@@ -93,6 +97,9 @@ public class EngineCMP : GH_BeautifulComponent
         text = null; if (da.GetData(1, ref text) && !string.IsNullOrWhiteSpace(text)) s.Cli = text.Trim();
         if (da.GetData(2, ref d)) s.Cpus = Math.Max(0, d);
         da.GetData(3, ref gpu); s.Gpu = gpu;
+        if (gpu && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            Warning("GPU has no effect on macOS: a container runs in a Linux VM with no Metal "
+                    + "passthrough, so training runs on the CPU. Run the engine natively to use MPS.");
         var platform = Selected(4) ?? Platforms[0];
         s.Platform = platform == "native" ? null : platform;
         var backend = Selected(5) ?? Backends[0];

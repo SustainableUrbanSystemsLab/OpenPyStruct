@@ -7,12 +7,34 @@ from openpystruct.beam import beam_load_case, beam_model
 from openpystruct.datagen import generate
 from openpystruct.ml.features import FeatureSpec, Scaler, build_training_arrays, unify_label_with_c
 from openpystruct.ml.predict import predict
-from openpystruct.ml.train import train
+from openpystruct.ml.train import resolve_device, train
 from openpystruct.schema import DEFAULT_MATERIAL, DEFAULT_OPTIMIZER
 
 FAST_OPT = dict(DEFAULT_OPTIMIZER, epochs=5, patience=100)
 GEN = {"num_samples": 12, "workers": 1, "seed": 1, "length": 30.0, "n_elements": 6,
        "roller_x": [10.0, 30.0], "max_forces": 2, "udl": -500.0}
+
+
+def test_resolve_device_honours_a_request_and_falls_back():
+    import torch
+
+    assert resolve_device("cpu").type == "cpu"
+    # auto picks the best available; on a CPU-only box that is still cpu
+    chosen = resolve_device(None).type
+    assert chosen in ("cuda", "mps", "cpu")
+    if not torch.cuda.is_available():
+        mps = getattr(torch.backends, "mps", None)
+        expected = "mps" if (mps is not None and mps.is_available()) else "cpu"
+        assert chosen == expected
+    assert resolve_device("auto").type == chosen
+
+
+def test_training_reports_its_device(tmp_path):
+    data = generate(GEN, DEFAULT_MATERIAL, FAST_OPT, backend="numpy")
+    (tmp_path / "dataset.json").write_text(json.dumps(data))
+    res = train({"dataset": "dataset.json", "kind": "fnn", "n_cases": 3, "epochs": 2,
+                 "batch_size": 2, "hidden_units": 8, "num_blocks": 1}, str(tmp_path), device="cpu")
+    assert res["device"] == "cpu"
 
 
 def test_scaler_roundtrip():
