@@ -43,7 +43,7 @@ public class GH_ToggleParam : GH_PersistentParam<GH_Boolean>
     {
     }
 
-    public override Guid ComponentGuid => new("{A5425FFD-C77F-40E4-BF17-1D33C17EF2A0}");
+    public override Guid ComponentGuid => new("{99FC80D7-1649-40C5-B265-E034BA0C6333}");
 
     // Hidden: created in code by components, never placed from the ribbon.
     public override GH_Exposure Exposure => GH_Exposure.hidden;

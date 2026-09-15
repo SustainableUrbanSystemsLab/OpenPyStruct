@@ -26,7 +26,7 @@ public class FrameModelCMP : GH_BeautifulComponent
         UseParamUI();
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E02");
+    public override Guid ComponentGuid => new("22F165EF-54B9-4072-BBA4-055119504EB4");
     public override GH_Exposure Exposure => GH_Exposure.primary;
     protected override Bitmap Icon => Icons.For("Fr", Icons.ModelColor);
 

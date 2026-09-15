@@ -27,7 +27,7 @@ public class BeamModelCMP : GH_BeautifulComponent
         UseParamUI();
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E01");
+    public override Guid ComponentGuid => new("FA552D9D-6D28-4C2E-B977-FE9518F84D3C");
     public override GH_Exposure Exposure => GH_Exposure.primary;
     protected override Bitmap Icon => Icons.For("Bm", Icons.ModelColor);
 

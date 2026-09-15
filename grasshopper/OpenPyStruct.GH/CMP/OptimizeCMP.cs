@@ -18,7 +18,7 @@ public class OptimizeCMP : RunComponentBase
     {
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E10");
+    public override Guid ComponentGuid => new("B19D97ED-36F4-4056-987F-7B1FE140F04A");
     protected override Bitmap Icon => Icons.For("Opt", Icons.RunColor);
     protected override string Task => "optimize";
     protected override string ProgressLabel => "Optimizing";
@@ -93,7 +93,7 @@ public class PredictCMP : RunComponentBase
     {
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E11");
+    public override Guid ComponentGuid => new("E9ABE1CA-457E-4F68-871C-F451AD88433D");
     protected override Bitmap Icon => Icons.For("Prd", Icons.RunColor);
     protected override string Task => "predict";
     protected override string ProgressLabel => "Predicting";

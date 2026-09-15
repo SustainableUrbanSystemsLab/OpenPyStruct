@@ -133,7 +133,7 @@ public class GH_DropdownParam : GH_PersistentParam<GH_String>
     }
 
     public IEnumerable<string> SelectedLabels => Options.Where(kv => kv.Value).Select(kv => kv.Key);
-    public override Guid ComponentGuid => new("{47E6606F-4707-4697-B812-40DBF3B593E4}");
+    public override Guid ComponentGuid => new("{C11CE2E1-B347-4328-9134-F9B9A6FAB5EB}");
     protected override Bitmap Icon => GH_StandardIcons.BlankParameterIcon_24x24;
 
     public string GetLabel(string value)

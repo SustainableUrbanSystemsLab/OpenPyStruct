@@ -20,7 +20,7 @@ public class DeconstructResultCMP : GH_BeautifulComponent
         UseParamUI();
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E20");
+    public override Guid ComponentGuid => new("8885DA1A-EE71-4E72-B3A9-42ED60777935");
     public override GH_Exposure Exposure => GH_Exposure.primary;
     protected override Bitmap Icon => Icons.For("De", Icons.ResultsColor);
 

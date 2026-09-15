@@ -34,7 +34,7 @@ public class EngineCMP : GH_BeautifulComponent
         UseParamUI();
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E06");
+    public override Guid ComponentGuid => new("1CDC9B7F-DE3F-4305-BE94-2EF41FD12830");
     public override GH_Exposure Exposure => GH_Exposure.primary;
     protected override Bitmap Icon => Icons.For("En", Icons.SettingsColor);
     public override string MinWidthText => "image 'openpystruct' not found. Build it.";

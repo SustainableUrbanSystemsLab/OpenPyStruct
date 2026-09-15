@@ -18,7 +18,7 @@ public class MaterialCMP : GH_BeautifulComponent
         UseParamUI();
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E04");
+    public override Guid ComponentGuid => new("4C701DA5-692B-4C2A-AB58-BACB59024B5C");
     public override GH_Exposure Exposure => GH_Exposure.primary;
     protected override Bitmap Icon => Icons.For("Mt", Icons.SettingsColor);
 
@@ -63,7 +63,7 @@ public class OptimizerSettingsCMP : GH_BeautifulComponent
         UseParamUI();
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E05");
+    public override Guid ComponentGuid => new("00E00C71-1315-486A-873A-78AC82FEE870");
     public override GH_Exposure Exposure => GH_Exposure.primary;
     protected override Bitmap Icon => Icons.For("Op", Icons.SettingsColor);
 

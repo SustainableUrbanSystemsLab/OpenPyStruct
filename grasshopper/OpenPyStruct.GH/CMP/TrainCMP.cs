@@ -23,7 +23,7 @@ public class TrainCMP : RunComponentBase
     {
     }
 
-    public override Guid ComponentGuid => new("2B6F1A10-9C3D-4E52-8F71-0A1B2C3D4E13");
+    public override Guid ComponentGuid => new("4076644B-1ACF-4F33-AD48-5E89CCC24691");
     protected override Bitmap Icon => Icons.For("Trn", Icons.RunColor);
     protected override string Task => "train";
     protected override string ProgressLabel => "Training";
