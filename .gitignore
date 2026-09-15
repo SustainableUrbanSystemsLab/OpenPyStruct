@@ -21,3 +21,6 @@ StructDataLite.json
 training_data_*.json
 runs/
 .serena/
+
+# IDEs
+.idea/
