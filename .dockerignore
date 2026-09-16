@@ -1,0 +1,8 @@
+.git
+.claude
+.serena
+grasshopper/**/bin
+grasshopper/**/obj
+tests
+*.pth
+*.pt

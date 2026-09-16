@@ -1,0 +1,13 @@
+<Project>
+  <!-- One version for the whole plugin; every component appends it to its description. -->
+  <PropertyGroup>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <Company>SustainLab / OpenPyStruct Authors</Company>
+    <!-- Core is MIT; the GH plugin overrides this to GPL-3.0-or-later (it links Eddy3D's GUI code). -->
+    <Copyright>Copyright (c) OpenPyStruct Authors. MIT License.</Copyright>
+    <LangVersion>12</LangVersion>
+  </PropertyGroup>
+</Project>

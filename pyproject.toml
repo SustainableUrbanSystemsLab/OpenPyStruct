@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openpystruct"
+version = "0.1.0"
+description = "OpenSees + PyTorch structural optimization with ML surrogates, driven by a JSON case file"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.24",
+    "torch>=2.0",
+    "openseespy>=3.5",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+openpystruct = "openpystruct.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["openpystruct*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

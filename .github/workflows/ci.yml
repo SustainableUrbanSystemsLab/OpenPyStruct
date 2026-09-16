@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  python:
+    name: Python package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e ".[test]"
+      - name: Test
+        run: python -m pytest -q
+
+  dotnet:
+    name: Core + plugin (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build
+        run: dotnet build grasshopper/OpenPyStruct.sln -c Release
+      - name: Test
+        run: dotnet test grasshopper/OpenPyStruct.Core.Tests -c Release --no-build
+
+  image:
+    name: Engine image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -t openpystruct -f docker/Dockerfile .
+      - name: Smoke
+        run: |
+          mkdir -p work
+          python3 - <<'PY'
+          import json, numpy as np
+          x = np.linspace(0, 20, 11)
+          json.dump({"schema": "openpystruct.case/1", "task": "optimize",
+                     "model": {"kind": "beam", "nodes": [[float(v), 0.0] for v in x],
+                               "elements": [[i, i + 1] for i in range(10)],
+                               "supports": [{"node": 0, "type": "pin"}, {"node": 10, "type": "roller"}]},
+                     "load_cases": [{"point_loads": [{"node": 5, "fy": -1e5}]}],
+                     "optimizer": {"epochs": 5, "patience": 100}}, open("work/case.json", "w"))
+          PY
+          docker run --rm -v "$PWD/work:/work" openpystruct run /work/case.json /work/result.json
+          python3 -c "import json; r=json.load(open('work/result.json')); assert r['ok'], r; print('ok', len(r['I']), 'elements')"

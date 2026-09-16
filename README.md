@@ -7,6 +7,7 @@
 - [**OpenPyStruct**](#openpystruct)
   - [**Table of Contents**](#table-of-contents)
   - [**Features**](#features)
+  - [**Grasshopper Plugin**](#grasshopper-plugin)
   - [**Requirements**](#requirements)
     - [Option 1, Manual Install](#option-1-manual-install)
     - [Option 2, Conda Environment Install](#option-2-conda-environment-install)
@@ -33,6 +34,22 @@
 - **Transformer-Diffusion Modules - ML Structural Optimization:** Incorporates advanced attention mechanisms and diffusion-based techniques for modeling complex structural behavior.
 - **Feedforward Neural Networks (FNNs) - ML Structural Optimization:** Provides scalable solutions for simpler structural optimization tasks.
 - **Flexible Loss Functions and Parameter Design:** Supports user-defined constraints, objectives, and optimization goals.
+
+---
+
+## **Grasshopper Plugin**
+
+The optimizers and surrogates are also available as a **Rhino 8 / Grasshopper plugin** in
+[`grasshopper/`](grasshopper/README.md): model beams and frames in Rhino, run the OpenSees + PyTorch
+engine in a container (Podman or Docker), and get sections sized by I, force diagrams and deflected
+shapes back on the canvas. The engine is the [`openpystruct`](openpystruct/) Python package — the
+scripts below, factored into importable modules with a JSON case/result contract:
+
+```bash
+docker/build.sh                                   # build the engine image
+dotnet build grasshopper/OpenPyStruct.sln         # build the plugin (writes a .ghlink for Rhino 8)
+openpystruct run case.json result.json            # or drive the engine from the shell
+```
 
 ---
 

@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+
+# .NET
+grasshopper/**/bin/
+grasshopper/**/obj/
+*.user
+.vs/
+
+# Runs and trained artifacts
+*.pth
+*.pt
+dataset.json
+StructDataLite.json
+training_data_*.json
+runs/
+.serena/
+
+# IDEs
+.idea/
