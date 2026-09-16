@@ -52,10 +52,11 @@ jobs:
         run: |
           mkdir -p work
           python3 - <<'PY'
-          import json, numpy as np
-          x = np.linspace(0, 20, 11)
+          import json
+          # plain python on purpose: the runner has no numpy, and the smoke must not need it
+          x = [20.0 * i / 10 for i in range(11)]
           json.dump({"schema": "openpystruct.case/1", "task": "optimize",
-                     "model": {"kind": "beam", "nodes": [[float(v), 0.0] for v in x],
+                     "model": {"kind": "beam", "nodes": [[v, 0.0] for v in x],
                                "elements": [[i, i + 1] for i in range(10)],
                                "supports": [{"node": 0, "type": "pin"}, {"node": 10, "type": "roller"}]},
                      "load_cases": [{"point_loads": [{"node": 5, "fy": -1e5}]}],
